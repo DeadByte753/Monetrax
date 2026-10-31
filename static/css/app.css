@@ -300,3 +300,5 @@ html.dark .mx-sidebar { background: #0C1426; border-right: 1px solid #1C2741; }
 /* Reports */
 .mx-report-table td, .mx-report-table th { white-space: nowrap; }
 .mx-month-pick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+/* Long button labels may wrap instead of overflowing narrow cards */
+.mx-btn-wrap { white-space: normal; text-align: center; max-width: 100%; }

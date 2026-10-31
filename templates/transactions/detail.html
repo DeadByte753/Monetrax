@@ -39,7 +39,7 @@
                        "“" ~ tx.name ~ "” (" ~ (tx.amount|money) ~ ") will be removed and your totals will update.",
                        "Delete", False, url_for('transactions.index')) }}
       <div class="flex flex-wrap gap-3">
-        <a href="{{ url_for('transactions.duplicate', tx_id=tx.id) }}" class="mx-btn-secondary"><i data-lucide="copy"></i>Duplicate</a>
+        <a href="{{ url_for('transactions.duplicate', tx_id=tx.id) }}" class="mx-btn-secondary"><i data-lucide="layers"></i>Duplicate</a>
         <a href="{{ url_for('transactions.edit', tx_id=tx.id, next=request.path) }}" class="mx-btn-primary"><i data-lucide="pencil"></i>Edit</a>
       </div>
     </div>

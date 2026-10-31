@@ -13,7 +13,7 @@
 
 {% block content %}
 {% call c.page_header("Analytics & Reports", start.strftime('%b %d, %Y') ~ " – " ~ end.strftime('%b %d, %Y') ~ " · " ~ days ~ " day" ~ ("s" if days != 1 else "")) %}
-  <a href="{{ url_for('analytics.monthly', month=end.strftime('%Y-%m')) }}" class="mx-btn-secondary"><i data-lucide="file-text"></i>Monthly summary</a>
+  <a href="{{ url_for('analytics.monthly', month=end.strftime('%Y-%m')) }}" class="mx-btn-secondary"><i data-lucide="receipt-text"></i>Monthly summary</a>
   <a download href="{{ url_for('transactions.export_csv', start=start.isoformat(), end=end.isoformat()) }}" class="mx-btn-secondary"><i data-lucide="download"></i>Export CSV</a>
   <button type="button" class="mx-btn-secondary" data-print><i data-lucide="printer"></i>Print report</button>
 {% endcall %}
@@ -106,7 +106,7 @@
           <li class="flex items-center gap-2">
             <span class="h-2.5 w-2.5 flex-none" style="background: {{ b.wallet.color }}"></span>
             <span class="min-w-0 flex-1 truncate">{{ b.wallet.name }}{% if not b.wallet.spendable %} <span class="text-xs text-ink-500">· savings</span>{% endif %}</span>
-            <span class="text-ink-500 tabular-nums">{% if wallet_total > 0 and b.balance > 0 %}{{ (b.balance / wallet_total * 100)|round|int }}%{% endif %}</span>
+            <span class="text-ink-500 tabular-nums">{% if wallet_positive > 0 and b.balance > 0 %}{{ (b.balance / wallet_positive * 100)|round|int }}%{% endif %}</span>
             <span class="w-24 text-right font-semibold tabular-nums {{ 'text-[#B42318]' if b.is_negative }}">{{ b.balance|money }}</span>
           </li>
         {% endfor %}

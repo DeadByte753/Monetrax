@@ -110,7 +110,7 @@
               <td>
                 <div class="flex justify-end gap-1">
                   <a href="{{ url_for('transactions.detail', tx_id=t.id) }}" class="mx-icon-btn-sm" aria-label="View {{ t.name }}" title="Details"><i data-lucide="eye"></i></a>
-                  <a href="{{ url_for('transactions.duplicate', tx_id=t.id, next=request.full_path) }}" class="mx-icon-btn-sm" aria-label="Duplicate {{ t.name }}" title="Duplicate"><i data-lucide="copy"></i></a>
+                  <a href="{{ url_for('transactions.duplicate', tx_id=t.id, next=request.full_path) }}" class="mx-icon-btn-sm" aria-label="Duplicate {{ t.name }}" title="Duplicate"><i data-lucide="layers"></i></a>
                   <a href="{{ url_for('transactions.edit', tx_id=t.id, next=request.full_path) }}" class="mx-icon-btn-sm" aria-label="Edit {{ t.name }}" title="Edit"><i data-lucide="pencil"></i></a>
                   {{ c.delete_form(url_for('transactions.delete', tx_id=t.id), "Delete this transaction?",
                                    "“" ~ t.name ~ "” will be removed and your totals will update.", "Delete " ~ t.name, True, request.full_path) }}

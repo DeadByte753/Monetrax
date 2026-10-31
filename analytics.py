@@ -113,7 +113,9 @@ def index():
         savings_rate=savings_rate, avg_daily=avg_daily, exp_cats=exp_cats, inc_cats=inc_cats,
         biggest=biggest, charts=charts, flow_label=flow_label, range_error=range_error,
         trend_label="Daily" if days <= 92 else "Weekly", wallets=wallets, top=top,
-        wallet_total=sum((b.balance for b in wallets), Decimal("0")), savings_months=savings_months,
+        wallet_total=sum((b.balance for b in wallets), Decimal("0")),
+        wallet_positive=sum((b.balance for b in wallets if b.balance > 0), Decimal("0")),
+        savings_months=savings_months,
         savings_net_total=sum((Decimal(str(v)) for v in savings["net"]), Decimal("0")),
         savings_goal_now=Decimal(str(savings["goal_total"][-1])) if savings["goal_total"] else Decimal("0"),
     )
