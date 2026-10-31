@@ -1,11 +1,12 @@
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required, logout_user
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import delete, func, select, update
 
 from extensions import db
 from models import (THEMES, Budget, Category, Notification, RecurringRule, SavingsContribution, SavingsGoal,
                       Transaction, User, Wallet, WalletTransfer)
 from models import CUSTOM_COLORS
+import throttle
 from security import is_safe_redirect
 from utils import CURRENCIES, get_owned_or_404
 from validators import (email_error, full_name_error, is_school_email, normalize_email,
@@ -24,6 +25,18 @@ def _categories_with_usage():
         .group_by(Category.id).order_by(Category.type.desc(), Category.name)
     ).all()
     return rows
+
+
+def _password_error(password: str, wrong: str = "Your password is incorrect."):
+    """Check the signed-in user's password with lockout, so a stolen session can't guess it."""
+    k = throttle.key("user", current_user.id)
+    if wait := throttle.retry_after(k):
+        return throttle.wait_message(wait)
+    if current_user.check_password(password):
+        throttle.clear(k)
+        return None
+    throttle.record_failure(k)
+    return wrong
 
 
 def _render(errors=None, values=None, section="profile", status=200):
@@ -106,8 +119,8 @@ def password():
     new = request.form.get("new_password", "")
     confirm = request.form.get("confirm_password", "")
     errors = {}
-    if not current_user.check_password(current):
-        errors["current_password"] = "Your current password is incorrect."
+    if msg := _password_error(current, "Your current password is incorrect."):
+        errors["current_password"] = msg
     if msg := password_error(new):
         errors["new_password"] = msg
     elif new == current:
@@ -118,9 +131,14 @@ def password():
         errors["confirm_password"] = "Passwords don't match."
     if errors:
         return _render(errors, {}, "security", 400)
-    current_user.set_password(new)
+    user = current_user._get_current_object()
+    user.set_password(new)
     db.session.commit()
-    flash("Password changed.", "success")
+    # The new password changes the session id: re-issue this browser's session (and its "remember me"
+    # cookie, if it has one) so it stays signed in while every other device is signed out.
+    remembered = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token") in request.cookies
+    login_user(user, remember=remembered)
+    flash("Password changed. Other devices signed in to your account were signed out.", "success")
     return redirect(url_for("settings.index", section="security"))
 
 
@@ -169,8 +187,8 @@ def delete_category(cat_id):
 @login_required
 def reset_data():
     errors = {}
-    if not current_user.check_password(request.form.get("reset_password", "")):
-        errors["reset_password"] = "Your password is incorrect."
+    if msg := _password_error(request.form.get("reset_password", "")):
+        errors["reset_password"] = msg
     if request.form.get("reset_confirm", "").strip().upper() != "RESET":
         errors["reset_confirm"] = "Type RESET to confirm."
     if errors:
@@ -198,8 +216,8 @@ def reset_data():
 @login_required
 def delete_account():
     errors = {}
-    if not current_user.check_password(request.form.get("password", "")):
-        errors["delete_password"] = "Your password is incorrect."
+    if msg := _password_error(request.form.get("password", "")):
+        errors["delete_password"] = msg
     if request.form.get("confirm", "").strip().upper() != "DELETE":
         errors["delete_confirm"] = "Type DELETE to confirm."
     if errors:
@@ -212,6 +230,8 @@ def delete_account():
         db.session.execute(delete(model).where(model.user_id == uid))
     db.session.execute(delete(User).where(User.id == uid))
     db.session.commit()
+    throttle.clear(throttle.key("user", uid))
+    session.clear()  # before logout_user(), which leaves the flag that deletes the "remember me" cookie
     logout_user()
     flash("Your account and all its data were deleted.", "info")
     return redirect(url_for("auth.login"))

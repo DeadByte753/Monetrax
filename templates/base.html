@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#0B1B3F">
   <meta name="csrf-token" content="{{ csrf_token() }}">
 
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     (function () {
       var pref = "{{ theme_pref or '' }}";
       try {
@@ -38,7 +38,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     tailwind.config = {
       darkMode: "class",
       theme: {

@@ -12,4 +12,4 @@
   </div>
 </main>
 {% endblock %}
-{% block scripts %}<script>window.lucide && lucide.createIcons();</script>{% endblock %}
+{% block scripts %}<script nonce="{{ csp_nonce() }}">window.lucide && lucide.createIcons();</script>{% endblock %}

@@ -1,7 +1,8 @@
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from models import EmailAlreadyRegistered, User, burn_password_check
+import throttle
 from security import is_safe_redirect
 from validators import (email_error, normalize_email, normalize_name,
                           validate_login, validate_registration)
@@ -12,6 +13,13 @@ auth_bp = Blueprint("auth", __name__)
 def _after_login_target() -> str:
     nxt = request.form.get("next") or request.args.get("next")
     return nxt if is_safe_redirect(nxt) else url_for("dashboard.index")
+
+
+def _start_session(user, remember: bool) -> None:
+    """Sign in on a fresh session so nothing from before login (a planted session) carries over."""
+    session.clear()
+    login_user(user, remember=remember)
+    user.record_login()
 
 
 @auth_bp.route("/")
@@ -34,18 +42,28 @@ def login():
         form = {"email": email, "remember": remember}
 
         errors = validate_login(email, password)
+        status = 400
         if not errors:
-            user = User.get_by_email(email)
-            if user is None:
-                burn_password_check(password)
-            elif user.check_password(password):
-                login_user(user, remember=remember)
-                user.record_login()
-                return redirect(_after_login_target())
-            errors["form"] = "Incorrect email or password. Please try again."
+            keys = (throttle.key("email", email), throttle.key("ip", throttle.client_ip()))
+            wait = throttle.retry_after(*keys)
+            if wait:
+                # Locked: don't even check the password, so a lockout can't be used to keep guessing.
+                errors["form"] = throttle.wait_message(wait)
+                status = 429
+            else:
+                user = User.get_by_email(email)
+                if user is None:
+                    burn_password_check(password)
+                elif user.check_password(password):
+                    throttle.clear(keys[0])
+                    throttle.prune()
+                    _start_session(user, remember)
+                    return redirect(_after_login_target())
+                throttle.record_failure(*keys)
+                errors["form"] = "Incorrect email or password. Please try again."
 
-        return render_template("auth/login.html", form=form, errors=errors,
-                               next=request.form.get("next", "")), 400
+        resp = render_template("auth/login.html", form=form, errors=errors, next=request.form.get("next", ""))
+        return (resp, status, {"Retry-After": "900"}) if status == 429 else (resp, status)
 
     return render_template("auth/login.html", form=form, errors=errors, next=request.args.get("next", ""))
 
@@ -68,6 +86,9 @@ def register():
         form = {"full_name": full_name, "email": email, "terms": terms}
 
         errors = validate_registration(full_name, email, password, confirm, terms, require_school)
+        reg_key = throttle.key("register", throttle.client_ip())
+        if not errors and (wait := throttle.retry_after(reg_key)):
+            errors["form"] = throttle.wait_message(wait)
         if not errors and User.email_exists(email):
             errors["email"] = "An account with this email already exists. Try signing in instead."
 
@@ -77,8 +98,8 @@ def register():
             except EmailAlreadyRegistered:
                 errors["email"] = "An account with this email already exists. Try signing in instead."
             else:
-                login_user(user)
-                user.record_login()
+                throttle.record_failure(reg_key)
+                _start_session(user, False)
                 flash(f"Welcome to Monetrax, {user.first_name}! Start by adding your allowance.", "success")
                 return redirect(url_for("dashboard.index"))
 
@@ -110,6 +131,7 @@ def forgot_password():
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
+    session.clear()  # before logout_user(), which leaves the flag that deletes the "remember me" cookie
     logout_user()
     flash("You've been signed out. See you soon!", "success")
     return redirect(url_for("auth.login"))

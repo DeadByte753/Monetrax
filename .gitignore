@@ -1,0 +1,19 @@
+# Local database and secrets — never commit these
+instance/
+*.sqlite3
+*.db
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

@@ -12,6 +12,8 @@ services:
         generateValue: true
       - key: SECURE_COOKIES
         value: "true"
+      - key: TRUST_PROXY
+        value: "1"
       - key: APP_TIMEZONE
         value: Asia/Manila
       - key: MONETRAX_REQUIRE_SCHOOL_EMAIL

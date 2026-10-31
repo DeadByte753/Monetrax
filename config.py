@@ -1,5 +1,4 @@
 import os
-import secrets
 from datetime import timedelta
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -24,7 +23,15 @@ def _database_url() -> str:
 
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("MONETRAX_SECRET_KEY") or secrets.token_hex(32)
+    # Without an env key, create_app() loads (or creates once) instance/secret_key, so sessions survive
+    # restarts and every worker signs cookies with the same key.
+    SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ.get("MONETRAX_SECRET_KEY") or None
+
+    # Reject oversized request bodies (no route accepts uploads; forms are a few KB).
+    MAX_CONTENT_LENGTH = 1024 * 1024
+    # Number of reverse proxies in front of the app (Render: 1). Used to read the real client IP for
+    # sign-in lockouts and HTTPS detection. Leave 0 when the app is reached directly.
+    TRUST_PROXY = int(os.environ.get("TRUST_PROXY", "0") or 0)
 
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False

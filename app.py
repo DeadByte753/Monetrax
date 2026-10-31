@@ -22,6 +22,12 @@ def create_app(config_object=Config) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
     os.makedirs(app.instance_path, exist_ok=True)
+    if not app.config.get("SECRET_KEY"):
+        app.config["SECRET_KEY"] = _instance_secret_key(app)
+    if app.config.get("TRUST_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        n = app.config["TRUST_PROXY"]
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=n, x_proto=n, x_host=n)
 
     from extensions import db, login_manager
     import models
@@ -47,6 +53,30 @@ def create_app(config_object=Config) -> Flask:
         _backfill_wallets(db)
 
     return app
+
+
+def _instance_secret_key(app: Flask) -> str:
+    """Read instance/secret_key, creating it (owner-only permissions) the first time. Exclusive create
+    means two workers starting together still end up sharing one key."""
+    import secrets
+    import time
+
+    path = os.path.join(app.instance_path, "secret_key")
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        for _ in range(50):
+            with open(path, encoding="utf-8") as fh:
+                key = fh.read().strip()
+            if key:
+                return key
+            time.sleep(0.02)
+        raise RuntimeError(f"{path} is empty. Delete it or set SECRET_KEY.")
+    key = secrets.token_hex(32)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(key)
+    app.logger.warning("No SECRET_KEY set; generated one in %s. Set SECRET_KEY in production.", path)
+    return key
 
 
 def _add_missing_columns(db) -> None:
@@ -199,6 +229,11 @@ def _register_errors(app: Flask) -> None:
     def not_found(_e):
         return render_template("errors/error.html", code=404, title="Page not found",
                                message="The page you're looking for doesn't exist or was moved."), 404
+
+    @app.errorhandler(413)
+    def too_large(_e):
+        return render_template("errors/error.html", code=413, title="Request too large",
+                               message="That request was bigger than Monetrax accepts."), 413
 
     @app.errorhandler(500)
     def server_error(_e):

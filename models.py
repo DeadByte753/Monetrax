@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
+from flask import current_app
 from flask_login import UserMixin
 from sqlalchemy import (Boolean, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text,
                         UniqueConstraint, func, select)
@@ -90,6 +93,9 @@ class User(UserMixin, db.Model):
             raise EmailAlreadyRegistered(email) from exc
         return user
 
+    def get_id(self) -> str:
+        return f"{self.id}.{_session_stamp(self.password_hash)}"
+
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
 
@@ -105,12 +111,32 @@ def burn_password_check(password: str) -> None:
     check_password_hash(_DUMMY_HASH, password)
 
 
+def _session_stamp(password_hash: str) -> str:
+    """Short keyed fingerprint of the password hash. It is part of the login session id, so changing the
+    password (or resetting it) signs the account out everywhere else, including "remember me" cookies."""
+    key = (current_app.config.get("SECRET_KEY") or "").encode()
+    return hmac.new(key, (password_hash or "").encode(), hashlib.sha256).hexdigest()[:24]
+
+
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
-    try:
-        return db.session.get(User, int(user_id))
-    except (TypeError, ValueError):
+    uid, sep, stamp = (user_id or "").partition(".")
+    if not sep or not uid.isdigit():
         return None
+    user = db.session.get(User, int(uid))
+    if user is None or not hmac.compare_digest(stamp, _session_stamp(user.password_hash)):
+        return None
+    return user
+
+
+class AuthThrottle(db.Model):
+    """Failed sign-in / password attempts per key ("email:…", "ip:…", "user:…") for brute-force lockout."""
+    __tablename__ = "auth_throttle"
+
+    key: Mapped[str] = mapped_column(String(300), primary_key=True)
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+    window_start: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
 DEFAULT_CATEGORIES = [
