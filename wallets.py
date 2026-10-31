@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func, or_, select
 
 from extensions import db
-from models import WALLET_TYPES, RecurringRule, Transaction, Wallet, WalletTransfer
+from models import WALLET_DEFAULT_NAMES, WALLET_TYPES, RecurringRule, Transaction, Wallet, WalletTransfer
 import finance
 from utils import format_money, get_owned_or_404, today
 from validators import validate_transfer, validate_wallet
@@ -57,7 +57,8 @@ def form(wallet_id=None):
                   "color": wallet.color, "spendable": wallet.spendable}
     else:
         wtype = request.args.get("type") if request.args.get("type") in WALLET_TYPES else "gcash"
-        values = {"name": "", "type": wtype, "opening_balance": "", "color": WALLET_TYPES[wtype][2], "spendable": True}
+        values = {"name": WALLET_DEFAULT_NAMES[wtype], "type": wtype, "opening_balance": "",
+                  "color": WALLET_TYPES[wtype][2], "spendable": True}
     errors = {}
     if request.method == "POST":
         data, errors = validate_wallet(request.form, WALLET_TYPES)
@@ -80,7 +81,7 @@ def form(wallet_id=None):
             flash(f"Wallet “{wallet.name}” {'added' if created else 'updated'}.", "success")
             return redirect(url_for("wallets.index"))
     return render_template("wallets/form.html", values=values, errors=errors, wallet=wallet,
-                           wallet_types=WALLET_TYPES), (400 if errors else 200)
+                           wallet_types=WALLET_TYPES, default_names=WALLET_DEFAULT_NAMES), (400 if errors else 200)
 
 
 @wallets_bp.route("/<int:wallet_id>/hide", methods=["POST"])

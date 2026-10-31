@@ -303,6 +303,9 @@ WALLET_TYPES = {
     "card": ("Prepaid card", "credit-card", "#7C3AED"),
     "other": ("Other", "wallet", "#64748B"),
 }
+# Name filled in automatically when a type is picked on the "Add a wallet" form.
+WALLET_DEFAULT_NAMES = {"cash": "Cash", "gcash": "GCash", "maya": "Maya", "bank": "Bank Account",
+                        "card": "Prepaid Card", "other": "Other"}
 DEFAULT_WALLETS = [("Cash", "cash"), ("GCash", "gcash")]
 
 

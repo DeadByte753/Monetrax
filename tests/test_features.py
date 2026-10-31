@@ -293,3 +293,34 @@ def test_unique_index_migration_is_safe(app):
         db.session.commit()
         _add_recurring_unique_index(app, db)
         assert has_index()
+
+
+# ---------- Wallet name from type ----------
+
+def test_new_wallet_form_names_follow_type(user_client):
+    page = user_client.get("/wallets/new").data.decode()
+    assert 'data-wallet-form="create"' in page
+    assert re.search(r'id="f-name" name="name" type="text" value="GCash"', page)
+    for key, name in (("cash", "Cash"), ("gcash", "GCash"), ("maya", "Maya"), ("bank", "Bank Account"),
+                      ("card", "Prepaid Card"), ("other", "Other")):
+        assert f'value="{key}" data-default-name="{name}"' in page
+    assert 'value="Maya"' in user_client.get("/wallets/new?type=maya").data.decode()
+
+
+def test_editing_wallet_keeps_its_name(app, user_client):
+    user_client.post("/wallets/new", data={"name": "BPI Savings", "type": "bank", "opening_balance": "100"})
+    page = user_client.get("/wallets/3/edit").data.decode()
+    assert 'data-wallet-form="edit"' in page and 'value="BPI Savings"' in page
+    r = user_client.post("/wallets/3/edit", data={"name": "BPI Savings", "type": "card", "opening_balance": "100",
+                                                  "spendable": "on"})
+    assert r.status_code == 302
+    with app.app_context():
+        w = db.session.get(Wallet, 3)
+        assert (w.name, w.type, w.opening_balance) == ("BPI Savings", "card", Decimal("100"))
+        assert {x.name for x in db.session.scalars(select(Wallet))} == {"Cash", "GCash", "BPI Savings"}
+
+
+def test_auto_name_still_validated(user_client):
+    r = user_client.post("/wallets/new", data={"name": "Cash", "type": "cash", "opening_balance": ""})
+    assert r.status_code == 400 and b"already have a wallet called Cash" in r.data
+    assert user_client.post("/wallets/new", data={"name": "Maya", "type": "maya"}).status_code == 302

@@ -109,15 +109,20 @@
   }
 
   function initWalletForm() {
-    const name = $("[data-wallet-name]");
-    const color = $("[data-wallet-color]");
-    if (!name) return;
-    let nameTouched = name.value.trim() !== "";
+    const form = $("form[data-wallet-form]");
+    if (!form) return;
+    const name = $("[data-wallet-name]", form);
+    const color = $("[data-wallet-color]", form);
+    // Only a new wallet gets its name from the type; editing never rewrites a saved name.
+    const autoName = form.dataset.walletForm === "create";
     let colorTouched = false;
-    name.addEventListener("input", () => { nameTouched = name.value.trim() !== ""; });
     if (color) color.addEventListener("input", () => { colorTouched = true; });
-    $$('input[name="type"]').forEach((r) => r.addEventListener("change", () => {
-      if (!nameTouched) name.value = r.dataset.defaultName || "";
+    $$('input[name="type"]', form).forEach((r) => r.addEventListener("change", () => {
+      if (!r.checked) return;
+      if (autoName && name && r.dataset.defaultName) {
+        name.value = r.dataset.defaultName;
+        name.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       if (color && !colorTouched && r.dataset.color) color.value = r.dataset.color;
     }));
   }

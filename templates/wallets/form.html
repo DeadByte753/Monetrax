@@ -6,7 +6,7 @@
   <a href="{{ url_for('wallets.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Wallets</a>
   {{ c.page_header('Edit wallet' if wallet else 'Add a wallet', 'Cash in your pocket, an e-wallet or a bank account.') }}
 
-  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" novalidate>
+  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" novalidate data-wallet-form="{{ 'edit' if wallet else 'create' }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <fieldset>
@@ -14,7 +14,7 @@
       <div class="mx-wallet-types">
         {% for key, info in wallet_types.items() %}
           <label class="mx-icon-pick mx-type-pick">
-            <input type="radio" name="type" value="{{ key }}" data-default-name="{{ info[0] if key not in ('bank','card','other') else '' }}" data-color="{{ info[2] }}" {% if values.type == key %}checked{% endif %}>
+            <input type="radio" name="type" value="{{ key }}" data-default-name="{{ default_names[key] }}" data-color="{{ info[2] }}" {% if values.type == key %}checked{% endif %}>
             <span><i data-lucide="{{ info[1] }}"></i><span class="text-[12.5px] font-semibold">{{ info[0] }}</span></span>
           </label>
         {% endfor %}
