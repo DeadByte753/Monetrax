@@ -15,13 +15,16 @@
 </section>
 
 <form method="get" class="mx-card mt-6 p-4 sm:p-5" data-autosubmit role="search" aria-label="Filter transactions">
-  <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.6fr)_repeat(6,minmax(0,1fr))]">
-    <div class="relative">
+  {# Each field's minimum width is its longest option in ch (VT323 is monospaced), so nothing clips. #}
+  {% set cat_ch = ([14] + categories|map(attribute='name')|map('length')|list)|max %}
+  {% set wal_ch = ([11] + wallets|map(attribute='name')|map('length')|map('int')|list)|max + (9 if wallets|selectattr('archived')|list else 0) %}
+  <div class="mx-filters">
+    <div class="mx-filter is-search relative" style="--fw: 22ch">
       <label for="q" class="sr-only">Search</label>
       <i data-lucide="search" class="mx-search-icon" aria-hidden="true"></i>
       <input id="q" type="search" name="q" value="{{ f.q }}" placeholder="Search name or note" class="mx-control has-prefix">
     </div>
-    <div class="relative">
+    <div class="mx-filter relative" style="--fw: 9ch">
       <label for="type" class="sr-only">Type</label>
       <select id="type" name="type" class="mx-control mx-select">
         <option value="">All types</option>
@@ -30,7 +33,7 @@
       </select>
       <i data-lucide="chevron-down" class="mx-select-caret" aria-hidden="true"></i>
     </div>
-    <div class="relative">
+    <div class="mx-filter relative" style="--fw: {{ cat_ch }}ch">
       <label for="category" class="sr-only">Category</label>
       <select id="category" name="category" class="mx-control mx-select">
         <option value="">All categories</option>
@@ -44,7 +47,7 @@
       </select>
       <i data-lucide="chevron-down" class="mx-select-caret" aria-hidden="true"></i>
     </div>
-    <div class="relative">
+    <div class="mx-filter relative" style="--fw: {{ wal_ch }}ch">
       <label for="wallet" class="sr-only">Wallet</label>
       <select id="wallet" name="wallet" class="mx-control mx-select">
         <option value="">All wallets</option>
@@ -52,15 +55,15 @@
       </select>
       <i data-lucide="chevron-down" class="mx-select-caret" aria-hidden="true"></i>
     </div>
-    <div>
+    <div class="mx-filter is-date" style="--fw: 10ch">
       <label for="start" class="sr-only">From date</label>
       <input id="start" type="date" name="start" value="{{ f.start.isoformat() if f.start }}" class="mx-control" title="From">
     </div>
-    <div>
+    <div class="mx-filter is-date" style="--fw: 10ch">
       <label for="end" class="sr-only">To date</label>
       <input id="end" type="date" name="end" value="{{ f.end.isoformat() if f.end }}" class="mx-control" title="To">
     </div>
-    <div class="relative">
+    <div class="mx-filter relative" style="--fw: 14ch">
       <label for="sort" class="sr-only">Sort by</label>
       <select id="sort" name="sort" class="mx-control mx-select">
         <option value="date_desc" {% if f.sort == 'date_desc' %}selected{% endif %}>Newest first</option>
@@ -71,11 +74,11 @@
       <i data-lucide="chevron-down" class="mx-select-caret" aria-hidden="true"></i>
     </div>
   </div>
-  <div class="mt-3 flex flex-wrap items-center gap-3">
+  <div class="mx-filter-actions">
     <button type="submit" class="mx-btn-secondary mx-btn-sm"><i data-lucide="filter"></i>Apply</button>
     {% if filtered %}
       <a href="{{ url_for('transactions.index') }}" class="mx-link text-sm">Clear filters</a>
-      <p class="ml-auto text-sm text-ink-500">
+      <p class="mx-filter-summary text-sm text-ink-500">
         {{ total_count }} result{{ 's' if total_count != 1 }} ·
         <span class="text-mint-700">+{{ sums.income|money }}</span> ·
         <span class="text-navy-900">−{{ sums.expense|money }}</span>

@@ -302,3 +302,26 @@ html.dark .mx-sidebar { background: #0C1426; border-right: 1px solid #1C2741; }
 .mx-month-pick { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 /* Long button labels may wrap instead of overflowing narrow cards */
 .mx-btn-wrap { white-space: normal; text-align: center; max-width: 100%; }
+
+/* Transaction filters: wrap by content instead of a fixed 7-column grid that squeezed selects below their text.
+   --fw is the longest value in ch (monospaced VT323), measured at the controls' own font size. */
+.mx-filters { display: flex; flex-wrap: wrap; gap: 14px 12px; font-family: var(--f-body, inherit); font-size: 17px; }
+.mx-filter {
+  /* text + 14px left padding + 40px caret lane + 3px pixel outline on each side */
+  --fw-box: calc(var(--fw, 10ch) + 60px);
+  flex: 1 1 var(--fw-box); min-width: min(100%, var(--fw-box)); box-sizing: border-box;
+}
+.mx-filter.is-search { --fw-box: calc(var(--fw) + 60px); flex-grow: 3; }
+.mx-filter.is-date { --fw-box: calc(var(--fw) + 72px); } /* date text + calendar button */
+.mx-filters .mx-control { box-sizing: border-box; width: 100%; min-width: 0; white-space: nowrap; }
+.mx-filters .mx-select { text-overflow: ellipsis; overflow: hidden; }
+.mx-filters input[type="date"] { padding-right: 10px; }
+.mx-filters input[type="date"]::-webkit-calendar-picker-indicator { flex: none; margin-left: 6px; cursor: pointer; }
+.mx-filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 16px; }
+.mx-filter-summary { margin-left: auto; }
+@media (max-width: 639px) {
+  .mx-filter { flex-basis: 100%; }            /* phones: one field per row */
+  .mx-filter-summary { margin-left: 0; flex-basis: 100%; }
+}
+.mx-filters input[type="search"] { -webkit-appearance: none; appearance: none; }
+.mx-filters input[type="search"]::-webkit-search-decoration { display: none; }
