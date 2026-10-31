@@ -20,6 +20,12 @@
       document.documentElement.dataset.themePref = pref;
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         document.documentElement.classList.add("mx-motion");
+        try {
+          if (!sessionStorage.getItem("mx-booted")) {
+            sessionStorage.setItem("mx-booted", "1");
+            document.documentElement.classList.add("mx-booting");
+          }
+        } catch (e) {}
       }
     })();
   </script>
@@ -60,6 +66,7 @@
   {% block head %}{% endblock %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/motion.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/pixel.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/arcade.css') }}">
 </head>
 <body class="h-full bg-canvas font-sans text-navy-900 antialiased" data-currency="{{ currency_symbol or '₱' }}"
       {% if current_user.is_authenticated %}data-theme-endpoint="{{ url_for('settings.theme') }}"{% endif %}>

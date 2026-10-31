@@ -33,7 +33,7 @@
 
 {% macro empty_state(icon, title, text, action_url=None, action_label=None) -%}
   <div class="flex flex-col items-center px-6 py-12 text-center">
-    <span class="mx-tile mx-tile-mint mb-4 h-14 w-14 rounded-2xl" aria-hidden="true"><i data-lucide="{{ icon }}"></i></span>
+    <span class="mx-tile mx-tile-mint mx-sprite mb-4 h-14 w-14 rounded-2xl" aria-hidden="true"><i data-lucide="{{ icon }}"></i></span>
     <p class="text-base font-bold">{{ title }}</p>
     <p class="mt-1 max-w-sm text-sm text-ink-500">{{ text }}</p>
     {% if action_url %}<a href="{{ action_url }}" class="mx-btn-primary mt-5"><i data-lucide="plus"></i>{{ action_label }}</a>{% endif %}

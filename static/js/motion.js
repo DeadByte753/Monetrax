@@ -4,74 +4,76 @@
   const root = document.documentElement;
   const motionOK = () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const NUMBER_RE = /^([−\-+]?)(\D*?)(\d[\d,]*)(\.\d+)?(\D*)$/;
-
-  function parseAmount(text) {
-    const m = text.trim().match(NUMBER_RE);
-    if (!m) return null;
-    const value = parseFloat(m[3].replace(/,/g, "") + (m[4] || ""));
-    if (!isFinite(value)) return null;
-    return {
-      sign: m[1], prefix: m[2], suffix: m[5], value,
-      decimals: m[4] ? m[4].length - 1 : 0,
-      grouping: m[3].indexOf(",") !== -1
-    };
-  }
-
-  function formatAmount(p, v) {
-    const n = v.toLocaleString("en-US", {
-      minimumFractionDigits: p.decimals, maximumFractionDigits: p.decimals, useGrouping: p.grouping
-    });
-    return p.sign + p.prefix + n + p.suffix;
-  }
-
-  const easeOutExpo = (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
+  // ---------- Arcade score reels ----------
+  // Every digit spins like a slot reel, then locks in left to right. Digits in VT323 are all the same
+  // width, so nothing shifts while it spins. The real text is restored when the reel stops.
   const running = new Set();
+  const randDigit = () => String(Math.floor(Math.random() * 10));
 
-  function countUp(el) {
+  function reel(el, delay) {
     const original = el.textContent;
-    const parsed = parseAmount(original);
-    if (!parsed || parsed.value === 0) {
+    if (!/\d/.test(original) || el.dataset.reeling) {
       el.classList.add("is-counted");
       return;
     }
-    const delay = parseInt(el.dataset.countDelay || "250", 10);
-    const duration = Math.min(1600, 900 + Math.log10(parsed.value + 1) * 120);
-    const job = { el, original, done: false };
-    running.add(job);
+    el.dataset.reeling = "1";
+    el.classList.add("is-counted");
+    el.setAttribute("aria-label", original.trim());
+    const wrap = document.createElement("span");
+    wrap.className = "mx-reel";
+    wrap.setAttribute("aria-hidden", "true");
+    const cells = [];
+    for (const ch of original) {
+      if (/\d/.test(ch)) {
+        const d = document.createElement("span");
+        d.className = "mx-reel-d is-spinning";
+        d.textContent = randDigit();
+        d.dataset.final = ch;
+        wrap.appendChild(d);
+        cells.push(d);
+      } else {
+        wrap.appendChild(document.createTextNode(ch));
+      }
+    }
+    el.textContent = "";
+    el.appendChild(wrap);
+
+    const job = { done: false };
     const finish = () => {
       if (job.done) return;
       job.done = true;
       el.textContent = original;
+      el.removeAttribute("aria-label");
+      delete el.dataset.reeling;
       running.delete(job);
     };
     job.finish = finish;
-    try {
-      el.textContent = formatAmount(parsed, 0);
-    } catch (_) {
-      finish();
-      el.classList.add("is-counted");
-      return;
-    }
-    el.classList.add("is-counted");
-    let start = null;
-    const step = (now) => {
+    running.add(job);
+
+    const t0 = performance.now() + delay;
+    const step = Math.max(45, Math.min(80, 520 / cells.length));
+    const lockAt = cells.map((_, i) => t0 + 300 + i * step);
+    const endAt = lockAt[lockAt.length - 1] + 260;
+    // A 55ms timer (not requestAnimationFrame) gives the stepped arcade cadence and keeps running in
+    // background tabs; the deadline below guarantees the real amount is always restored.
+    const tick = () => {
       if (job.done) return;
-      if (start === null) start = now + delay;
-      const t = Math.max(0, (now - start) / duration);
-      if (t >= 1) {
-        finish();
-        return;
-      }
-      try {
-        el.textContent = formatAmount(parsed, parsed.value * easeOutExpo(t));
-      } catch (_) {
-        finish();
-        return;
-      }
-      requestAnimationFrame(step);
+      const now = performance.now();
+      cells.forEach((d, i) => {
+        if (!d.classList.contains("is-spinning")) return;
+        if (now >= lockAt[i]) {
+          d.textContent = d.dataset.final;
+          d.classList.remove("is-spinning");
+          d.classList.add("is-locked");
+        } else if (now >= t0 - 120) {
+          d.textContent = randDigit();
+        }
+      });
+      if (now >= endAt) finish();
+      else setTimeout(tick, 55);
     };
-    requestAnimationFrame(step);
+    setTimeout(tick, 55);
+    setTimeout(finish, Math.max(0, endAt - performance.now()) + 1200);
   }
 
   function initCounters() {
@@ -82,15 +84,85 @@
       return;
     }
     const vh = window.innerHeight || document.documentElement.clientHeight;
+    const later = [];
+    let n = 0;
     els.forEach((el) => {
       const r = el.getBoundingClientRect();
-      const visible = r.bottom > 0 && r.top < vh && r.width > 0;
-      if (visible) countUp(el);
-      else el.classList.add("is-counted");
+      if (r.bottom > 0 && r.top < vh && r.width > 0) reel(el, 180 + (n++) * 90);
+      else { el.classList.add("is-counted"); later.push(el); }
     });
+    if (later.length && "IntersectionObserver" in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          io.unobserve(entry.target);
+          reel(entry.target, 60);
+        });
+      }, { threshold: 0.6 });
+      later.forEach((el) => io.observe(el));
+    }
     const finishAll = () => running.forEach((job) => job.finish());
     window.addEventListener("beforeprint", finishAll);
     window.addEventListener("pagehide", finishAll);
+  }
+
+  // ---------- Terminal type-on page titles ----------
+  function initTypeOn() {
+    if (!motionOK() || !root.classList.contains("mx-motion")) return;
+    const h = document.querySelector(".mx-app-main h1");
+    if (!h || h.children.length || !h.textContent.trim()) return;
+    const text = h.textContent.trim();
+    const n = Math.max(text.length, 1);
+    const dur = Math.min(900, Math.max(280, n * 38));
+    const type = document.createElement("span");
+    type.className = "mx-type";
+    type.textContent = text;
+    type.style.setProperty("--n", String(n));
+    type.style.setProperty("--type-dur", dur + "ms");
+    const caret = document.createElement("span");
+    caret.className = "mx-caret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.style.setProperty("--caret-off", (dur + 1900) + "ms");
+    h.textContent = "";
+    h.append(type, caret);
+  }
+
+  // ---------- Success pays out pixel coins ----------
+  function coinBurst(from) {
+    const r = from.getBoundingClientRect();
+    if (!r.width) return;
+    const cx = r.left + r.width / 2 - 5;
+    const cy = r.top + r.height / 2 - 5;
+    for (let i = 0; i < 9; i++) {
+      const c = document.createElement("span");
+      c.className = "mx-coin";
+      c.setAttribute("aria-hidden", "true");
+      const angle = (-150 + (120 / 8) * i + (Math.random() * 10 - 5)) * Math.PI / 180;
+      const dist = 46 + Math.random() * 34;
+      c.style.left = cx + "px";
+      c.style.top = cy + "px";
+      c.style.setProperty("--dx", (Math.cos(angle) * dist).toFixed(1) + "px");
+      c.style.setProperty("--dy", (Math.sin(angle) * dist).toFixed(1) + "px");
+      c.style.animationDelay = (i % 3) * 30 + "ms";
+      c.addEventListener("animationend", () => c.remove());
+      setTimeout(() => c.remove(), 1400);
+      document.body.appendChild(c);
+    }
+  }
+
+  function initCoins() {
+    if (!motionOK() || !root.classList.contains("mx-motion")) return;
+    document.querySelectorAll(".mx-alert-success").forEach((alert, i) => {
+      setTimeout(() => {
+        const icon = alert.querySelector("svg, i") || alert;
+        coinBurst(icon);
+      }, 380 + i * 160);
+    });
+  }
+
+  function initBoot() {
+    if (!root.classList.contains("mx-booting")) return;
+    setTimeout(() => root.classList.remove("mx-booting"), 800);
   }
 
   function initParallax() {
@@ -122,6 +194,7 @@
   }
 
   const loadbar = () => document.querySelector(".mx-loadbar");
+  const crossPageTransitions = "onpagereveal" in window && typeof CSSViewTransitionRule !== "undefined";
 
   function startLoading() {
     const bar = loadbar();
@@ -163,7 +236,8 @@
       setTimeout(() => {
         if (!e.defaultPrevented || a.hasAttribute("data-transition")) {
           startLoading();
-          if (motionOK()) root.classList.add("mx-leaving");
+          // With cross-page view transitions the old page is snapshotted, so don't dim it first.
+          if (motionOK() && !crossPageTransitions) root.classList.add("mx-leaving");
         }
       }, 0);
     });
@@ -262,13 +336,16 @@
     }, true);
   }
 
-  window.MonetraxMotion = { closeDialog, dismissAlert, motionOK };
+  window.MonetraxMotion = { closeDialog, dismissAlert, motionOK, coinBurst };
 
   document.addEventListener("DOMContentLoaded", () => {
+    initBoot();
+    initTypeOn();
     initCounters();
     initParallax();
     initNavigationFeedback();
     initAlerts();
     initDialogs();
+    initCoins();
   });
 })();
