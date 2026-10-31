@@ -113,13 +113,12 @@
     if (!form) return;
     const name = $("[data-wallet-name]", form);
     const color = $("[data-wallet-color]", form);
-    // Only a new wallet gets its name from the type; editing never rewrites a saved name.
-    const autoName = form.dataset.walletForm === "create";
+    // Picking a type (on add or edit) fills the name; the saved name is only replaced when the type is changed.
     let colorTouched = false;
     if (color) color.addEventListener("input", () => { colorTouched = true; });
     $$('input[name="type"]', form).forEach((r) => r.addEventListener("change", () => {
       if (!r.checked) return;
-      if (autoName && name && r.dataset.defaultName) {
+      if (name && r.dataset.defaultName) {
         name.value = r.dataset.defaultName;
         name.dispatchEvent(new Event("input", { bubbles: true }));
       }
