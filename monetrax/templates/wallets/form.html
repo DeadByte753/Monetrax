@@ -1,0 +1,48 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ 'Edit wallet' if wallet else 'Add wallet' }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-xl">
+  <a href="{{ url_for('wallets.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Wallets</a>
+  {{ c.page_header('Edit wallet' if wallet else 'Add a wallet', 'Cash in your pocket, an e-wallet or a bank account.') }}
+
+  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <fieldset>
+      <legend class="mx-label">Type</legend>
+      <div class="mx-wallet-types">
+        {% for key, info in wallet_types.items() %}
+          <label class="mx-icon-pick mx-type-pick">
+            <input type="radio" name="type" value="{{ key }}" data-default-name="{{ info[0] if key not in ('bank','card','other') else '' }}" data-color="{{ info[2] }}" {% if values.type == key %}checked{% endif %}>
+            <span><i data-lucide="{{ info[1] }}"></i><span class="text-[12.5px] font-semibold">{{ info[0] }}</span></span>
+          </label>
+        {% endfor %}
+      </div>
+      {{ c.error_text("type", errors.type) }}
+    </fieldset>
+
+    {{ c.input("name", "Name", values.name, errors.name, placeholder="e.g. GCash, BPI Savings, Wallet", required=True, maxlength=40, extra="data-wallet-name") }}
+
+    {{ c.input("opening_balance", "Money in it now" if not wallet else "Starting balance", values.opening_balance, errors.opening_balance,
+               prefix=currency_symbol, placeholder="0.00", inputmode="decimal", extra="data-money",
+               hint=("How much is in this wallet today, before you log anything in Monetrax." if not wallet else
+                     "What was in the wallet when you added it. Changing this shifts its current balance by the same amount.")) }}
+
+    <label class="mx-switch-row">
+      <span><span class="block text-sm font-semibold">Use for daily spending</span>
+        <span class="block text-[13px] text-ink-500">Count this wallet in Safe to spend today. Turn off for savings you don't touch.</span></span>
+      <input type="checkbox" name="spendable" class="mx-switch" {% if values.spendable %}checked{% endif %}>
+    </label>
+
+    <div class="mx-field">
+      <label for="f-color" class="mx-label">Color</label>
+      <input id="f-color" type="color" name="color" value="{{ values.color or '#047857' }}" class="mx-color" data-wallet-color>
+    </div>
+
+    <div class="flex justify-end border-t border-ink-100 pt-5">
+      <button type="submit" class="mx-btn-primary mx-btn-lg"><i data-lucide="check"></i>{{ 'Save changes' if wallet else 'Add wallet' }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

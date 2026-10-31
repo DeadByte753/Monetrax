@@ -1,0 +1,21 @@
+{% extends "auth/_layout.html" %}
+{% block title %}Reset password{% endblock %}
+
+{% block card %}
+<a href="{{ url_for('auth.login') }}" class="mx-back mb-6" data-transition>
+  <i data-lucide="arrow-left"></i> Back to sign in
+</a>
+
+<header class="mb-7">
+  <span class="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-mint-50 text-mint-700"><i data-lucide="key-round"></i></span>
+  <h2 id="auth-title" class="text-[1.75rem] font-extrabold tracking-tight">Reset your password</h2>
+  <p class="mt-2 text-[15px] text-ink-500">Enter the email linked to your Monetrax account.</p>
+</header>
+
+<form method="post" action="{{ url_for('auth.forgot_password') }}" class="space-y-5" data-auth-form="forgot" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {{ ui.field("email", "Email address", type="email", icon="mail", value=form.email, error=errors.email,
+              placeholder="you@school.edu.ph", autocomplete="email", inputmode="email") }}
+  <div class="pt-1">{{ ui.button("Continue", "Checking…") }}</div>
+</form>
+{% endblock %}

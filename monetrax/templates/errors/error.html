@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% import "components/_ui.html" as ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+<main id="main" class="grid min-h-full place-items-center px-4 py-16 text-center">
+  <div>
+    <div class="flex justify-center">{{ ui.logo("dark", 34) }}</div>
+    <p class="mt-10 text-sm font-bold tracking-wider text-mint-700">ERROR {{ code }}</p>
+    <h1 class="mt-2 text-3xl font-extrabold tracking-tight">{{ title }}</h1>
+    <p class="mx-auto mt-3 max-w-md text-ink-500">{{ message }}</p>
+    <a href="{{ url_for('auth.root') }}" class="mx-btn mt-8 inline-flex w-auto px-6">Go to Monetrax</a>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}<script>window.lucide && lucide.createIcons();</script>{% endblock %}

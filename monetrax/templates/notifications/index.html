@@ -1,0 +1,61 @@
+{% extends "layouts/app.html" %}
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+{% call c.page_header("Notifications", "Budget warnings, savings milestones and reminders.") %}
+  <form method="post" action="{{ url_for('notifications.read_all') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="mx-btn-secondary" {% if not unread_notifications %}disabled{% endif %}><i data-lucide="check-check"></i>Mark all as read</button>
+  </form>
+  <form method="post" action="{{ url_for('notifications.clear_read') }}" data-confirm="Read notifications will be removed from this list." data-confirm-title="Clear read notifications?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="mx-btn-ghost"><i data-lucide="trash-2"></i>Clear read</button>
+  </form>
+{% endcall %}
+
+<nav class="mx-chips mb-4" aria-label="Filter notifications">
+  {% for k, label in [("all", "All"), ("unread", "Unread"), ("budget", "Budgets"), ("savings", "Savings")] %}
+    <a href="{{ url_for('notifications.index', show=k) }}" class="mx-chip-link{% if show == k %} is-active{% endif %}" {% if show == k %}aria-current="page"{% endif %}>
+      {{ label }}{% if k == 'unread' and unread_notifications %} <span class="mx-count">{{ unread_notifications }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+<section class="mx-card overflow-hidden" aria-label="Notifications">
+  {% if items %}
+    <ul class="divide-y divide-ink-100">
+      {% for n in items %}
+        <li class="mx-notif{% if not n.is_read %} is-unread{% endif %} is-{{ n.level }}">
+          <span class="mx-notif-icon" aria-hidden="true"><i data-lucide="{{ n.icon }}"></i></span>
+          <div class="min-w-0 flex-1">
+            <form method="post" action="{{ url_for('notifications.open_', nid=n.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="mx-notif-link">
+                <span class="block text-sm font-semibold">{% if not n.is_read %}<span class="sr-only">Unread: </span>{% endif %}{{ n.title }}</span>
+                <span class="mt-0.5 block text-[13px] leading-5 text-ink-500">{{ n.message }}</span>
+              </button>
+            </form>
+            <p class="mt-1 text-xs text-ink-400">{{ n.created_at|localtime }}</p>
+          </div>
+          <div class="flex flex-none items-start gap-1">
+            <form method="post" action="{{ url_for('notifications.toggle', nid=n.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="show" value="{{ show }}">
+              <button type="submit" class="mx-icon-btn-sm" aria-label="Mark as {{ 'unread' if n.is_read else 'read' }}" title="Mark as {{ 'unread' if n.is_read else 'read' }}">
+                <i data-lucide="{{ 'mail' if n.is_read else 'mail-open' }}"></i>
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('notifications.delete_one', nid=n.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="show" value="{{ show }}">
+              <button type="submit" class="mx-icon-btn-sm is-danger" aria-label="Dismiss" title="Dismiss"><i data-lucide="x"></i></button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ c.empty_state("bell-off", "You're all caught up", "Budget warnings and savings milestones will show up here.") }}
+  {% endif %}
+</section>
+{% endblock %}

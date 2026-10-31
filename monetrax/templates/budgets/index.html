@@ -1,0 +1,73 @@
+{% extends "layouts/app.html" %}
+{% block title %}Budget Management{% endblock %}
+
+{% block content %}
+{% call c.page_header("Budget Management", "Set limits per category and see how much room you have left.") %}
+  <a href="{{ url_for('budgets.create') }}" class="mx-btn-primary"><i data-lucide="plus"></i>New budget</a>
+{% endcall %}
+
+{% if statuses %}
+  {% set pct = (summary.spent / summary.limit * 100) if summary.limit else 0 %}
+  <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Budget summary">
+    {{ c.stat_card("Active budgets", summary.count, "wallet-cards", "navy") }}
+    {{ c.stat_card("Total limits", summary.limit|money, "target", "blue", "Across all periods") }}
+    {{ c.stat_card("Spent so far", summary.spent|money, "receipt", "violet", (pct|round|int) ~ "% of limits") }}
+    {{ c.stat_card("Need attention", summary.attention, "triangle-alert", "amber" if summary.attention else "mint",
+                   "At 75% or more" if summary.attention else "All budgets on track") }}
+  </section>
+
+  <section class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Budgets">
+    {% for s in statuses %}
+      {% set b = s.budget %}
+      <article class="mx-card mx-budget-card is-{{ s.level }} p-5">
+        <div class="flex items-start gap-3">
+          {{ c.cat_icon(b.category, "lg") }}
+          <div class="min-w-0 flex-1">
+            <h2 class="truncate text-base font-bold">{{ b.category.name }}</h2>
+            <p class="text-xs capitalize text-ink-500">{{ b.period }} · {{ s.period_label }}</p>
+          </div>
+          {{ c.level_badge(s.level, s.percent) }}
+        </div>
+
+        <div class="mt-5 flex items-end justify-between gap-2">
+          <p class="text-2xl font-extrabold tabular-nums" data-count>{{ s.spent|money }}</p>
+          <p class="pb-0.5 text-sm text-ink-500 tabular-nums">of {{ b.limit_amount|money }}</p>
+        </div>
+        <div class="mt-3">{{ c.progress(s.percent, s.level, b.category.name ~ " budget used") }}</div>
+
+        <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-xl bg-canvas px-3 py-2.5">
+            <dt class="text-xs text-ink-500">{{ 'Over by' if s.remaining < 0 else 'Remaining' }}</dt>
+            <dd class="font-bold tabular-nums {{ 'text-[#B42318]' if s.remaining < 0 }}">{{ (s.remaining|abs)|money }}</dd>
+          </div>
+          <div class="rounded-xl bg-canvas px-3 py-2.5">
+            <dt class="text-xs text-ink-500">Used</dt>
+            <dd class="font-bold tabular-nums">{{ s.percent|round|int }}%</dd>
+          </div>
+        </dl>
+
+        <div class="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
+          <a href="{{ url_for('transactions.index', category=b.category_id, type='expense', start=s.start.isoformat(), end=s.end.isoformat()) }}" class="mx-link text-sm">View expenses</a>
+          <div class="flex gap-1">
+            <a href="{{ url_for('budgets.edit', budget_id=b.id) }}" class="mx-icon-btn-sm" aria-label="Edit {{ b.category.name }} budget" title="Edit"><i data-lucide="pencil"></i></a>
+            {{ c.delete_form(url_for('budgets.delete', budget_id=b.id), "Delete this budget?",
+                             "Your " ~ b.period ~ " " ~ b.category.name ~ " budget will be removed. Transactions stay.",
+                             "Delete " ~ b.category.name ~ " budget") }}
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+
+  <p class="mt-6 flex items-center gap-2 text-sm text-ink-500">
+    <i data-lucide="bell-ring" class="h-4 w-4"></i>
+    You'll get a notification when a budget reaches 75%, 90%, and when it goes over 100%.
+  </p>
+{% else %}
+  <section class="mx-card">
+    {{ c.empty_state("wallet-cards", "Create your first budget",
+                     "Pick an expense category like Food, set a weekly or monthly limit, and Monetrax will warn you before you overspend.",
+                     url_for('budgets.create'), "New budget") }}
+  </section>
+{% endif %}
+{% endblock %}

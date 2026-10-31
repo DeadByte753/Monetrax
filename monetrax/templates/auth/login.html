@@ -1,0 +1,41 @@
+{% extends "auth/_layout.html" %}
+{% block title %}Sign in{% endblock %}
+
+{% block tabs %}{% with active = "login" %}{% include "auth/_tabs.html" %}{% endwith %}{% endblock %}
+
+{% block card %}
+<header class="mb-7">
+  <h2 id="auth-title" class="text-[1.75rem] font-extrabold tracking-tight">Welcome back</h2>
+  <p class="mt-2 text-[15px] text-ink-500">Take control of your finances and stay on track.</p>
+</header>
+
+{% if errors.form %}<div class="mb-6">{{ ui.alert("error", errors.form) }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('auth.login') }}" class="space-y-5" data-auth-form="login" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+  {{ ui.field("email", "Email address", type="email", icon="mail", value=form.email, error=errors.email,
+              placeholder="you@school.edu.ph", autocomplete="email", inputmode="email") }}
+
+  {{ ui.field("password", "Password", icon="lock", error=errors.password, password=True,
+              placeholder="Enter your password", autocomplete="current-password") }}
+
+  <div class="flex items-center justify-between gap-4">
+    <label class="flex min-h-[44px] cursor-pointer items-center gap-3 text-sm font-medium text-navy-900">
+      <span class="mx-check-wrap">
+        <input type="checkbox" name="remember" class="mx-check" {% if form.remember %}checked{% endif %}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" pathLength="1"/></svg>
+      </span>
+      Remember me
+    </label>
+    <a href="{{ url_for('auth.forgot_password') }}" class="mx-link text-sm" data-transition data-carry-email>Forgot password?</a>
+  </div>
+
+  <div class="pt-1">{{ ui.button("Sign In", "Signing in…") }}</div>
+</form>
+
+<p class="mt-8 text-center text-sm text-ink-500">
+  Don't have an account? <a href="{{ url_for('auth.register') }}" class="mx-link" data-transition>Create one.</a>
+</p>
+{% endblock %}

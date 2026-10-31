@@ -1,0 +1,61 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ 'Edit recurring' if rule else 'New recurring' }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <a href="{{ url_for('transactions.recurring_index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Recurring</a>
+  {{ c.page_header('Edit recurring' if rule else ('Recurring allowance' if values.type == 'income' else 'Recurring bill'),
+                   'Changes apply from the next date. Entries already added stay as they are.' if rule else
+                   'Monetrax adds it to your transactions on each date.') }}
+
+  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" data-tx-form novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <fieldset>
+      <legend class="mx-label">Type</legend>
+      <div class="mx-segment" role="radiogroup">
+        <label class="mx-segment-opt is-expense"><input type="radio" name="type" value="expense" {% if values.type != 'income' %}checked{% endif %}><span><i data-lucide="arrow-up-right"></i>Bill or expense</span></label>
+        <label class="mx-segment-opt is-income"><input type="radio" name="type" value="income" {% if values.type == 'income' %}checked{% endif %}><span><i data-lucide="arrow-down-left"></i>Income</span></label>
+      </div>
+      {{ c.error_text("type", errors.type) }}
+    </fieldset>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {{ c.input("name", "Name", values.name, errors.name, placeholder="e.g. Allowance, Netflix, Dorm rent", required=True, maxlength=100) }}
+      {{ c.input("amount", "Amount", values.amount, errors.amount, prefix=currency_symbol, placeholder="0.00",
+                 inputmode="decimal", required=True, extra="data-money") }}
+    </div>
+
+    {% set fopts = [] %}{% for k, v in frequencies.items() %}{% set _ = fopts.append((k, v)) %}{% endfor %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      {{ c.select("frequency", "Repeats", fopts, values.frequency, errors.frequency) }}
+      {{ c.input("date", "Next date" if rule else "First date", values.date, errors.date, type="date", required=True) }}
+      {{ c.input("end_date", "Ends", values.end_date, errors.end_date, type="date") }}
+    </div>
+    {% if not rule %}<p class="-mt-2 text-[13px] leading-5 text-ink-500">If the first date is in the past, Monetrax adds the entries you missed up to today.</p>{% endif %}
+
+    {% set opts = [] %}
+    {% for cat in categories %}{% set _ = opts.append((cat.id, cat.name, {"type": cat.type})) %}{% endfor %}
+    {{ c.select("category_id", "Category", opts, values.category_id, errors.category_id, placeholder="Choose a category",
+                extra='data-category-select') }}
+
+    <div class="mx-field{% if errors.wallet_id %} has-error{% endif %}">
+      <span class="mx-label" id="wallet-label" data-label-expense="Paid from" data-label-income="Received in">{{ 'Received in' if values.type == 'income' else 'Paid from' }}</span>
+      <div class="mx-wallet-pick" role="radiogroup" aria-labelledby="wallet-label">
+        {% for w in wallets %}
+          <label class="mx-wallet-chip" style="--cat: {{ w.color }}">
+            <input type="radio" name="wallet_id" value="{{ w.id }}" {% if values.wallet_id|string == w.id|string %}checked{% endif %}>
+            <span><i data-lucide="{{ w.icon }}"></i>{{ w.name }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {{ c.error_text("wallet_id", errors.wallet_id) }}
+    </div>
+
+    {{ c.textarea("description", "Note", values.description, errors.description, "Add a note") }}
+
+    <div class="flex justify-end border-t border-ink-100 pt-5">
+      <button type="submit" class="mx-btn-primary mx-btn-lg"><i data-lucide="check"></i>{{ 'Save changes' if rule else 'Start repeating' }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

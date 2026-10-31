@@ -1,0 +1,67 @@
+{% extends "layouts/app.html" %}
+{% block title %}Monthly summary · {{ month.strftime('%B %Y') }}{% endblock %}
+
+{% macro cat_table(rows, empty, tone="") -%}
+  {% if rows %}
+    <div class="overflow-x-auto">
+      <table class="mx-table mx-report-table mt-2">
+        <thead><tr><th scope="col">Category</th><th scope="col" class="text-right">Count</th><th scope="col" class="text-right">Share</th><th scope="col" class="text-right">Total</th></tr></thead>
+        <tbody>
+          {% for cat in rows %}
+            <tr>
+              <td><div class="flex items-center gap-3">{{ c.cat_icon(cat.category, "sm") }}<span class="font-semibold">{{ cat.name }}</span></div></td>
+              <td class="text-right text-ink-500 tabular-nums">{{ cat.count }}</td>
+              <td class="text-right tabular-nums">{{ '%.1f'|format(cat.share) }}%</td>
+              <td class="text-right font-semibold tabular-nums {{ tone }}">{{ cat.total|php }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="px-5 pb-5 pt-2 text-sm text-ink-500 sm:px-6">{{ empty }}</p>
+  {% endif %}
+{%- endmacro %}
+
+{% block content %}
+{% set t = s.totals %}
+<a href="{{ url_for('analytics.index') }}" class="mx-back mb-4 print:hidden"><i data-lucide="arrow-left"></i>Analytics</a>
+{% call c.page_header("Monthly summary", month.strftime('%B %Y') ~ " · " ~ t.count ~ " transaction" ~ ("s" if t.count != 1 else "")) %}
+  <a download href="{{ url_for('analytics.monthly_csv', month=month.strftime('%Y-%m')) }}" class="mx-btn-secondary print:hidden"><i data-lucide="download"></i>Download CSV</a>
+  <button type="button" class="mx-btn-secondary print:hidden" data-print><i data-lucide="printer"></i>Print</button>
+{% endcall %}
+
+<form method="get" class="mx-card mx-month-pick mb-6 p-4 print:hidden" aria-label="Choose month" data-autosubmit>
+  <a href="{{ url_for('analytics.monthly', month=prev_month.strftime('%Y-%m')) }}" class="mx-btn-ghost mx-btn-sm" aria-label="Previous month"><i data-lucide="chevron-left"></i>{{ prev_month.strftime('%b') }}</a>
+  <label class="text-xs font-medium text-ink-500">Month
+    <input type="month" name="month" value="{{ month.strftime('%Y-%m') }}" min="2000-01" max="{{ max_month }}" class="mx-control mt-1" required>
+  </label>
+  <button type="submit" class="mx-btn-primary mx-btn-sm">Show</button>
+  {% if next_month %}<a href="{{ url_for('analytics.monthly', month=next_month.strftime('%Y-%m')) }}" class="mx-btn-ghost mx-btn-sm" aria-label="Next month">{{ next_month.strftime('%b') }}<i data-lucide="chevron-right"></i></a>{% endif %}
+</form>
+
+<section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Month totals">
+  {{ c.stat_card("Income", t.income|php, "arrow-down-left", "mint", "Last month: " ~ (s.prev.income|php)) }}
+  {{ c.stat_card("Expenses", t.expense|php, "arrow-up-right", "navy", "Last month: " ~ (s.prev.expense|php)) }}
+  {{ c.stat_card("Net savings", s.net|php, "scale", "blue",
+                 (('%.0f'|format(s.savings_rate)) ~ "% of income kept") if s.savings_rate is not none else "No income this month",
+                 None if s.net >= 0 else "down") }}
+  {{ c.stat_card("Added to goals", s.goal_contributions|php, "piggy-bank", "violet", "Total in goals now: " ~ (s.goal_total|php)) }}
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+  <div class="mx-card overflow-hidden">
+    <h2 class="mx-h2 px-5 pt-5 sm:px-6">Expenses by category</h2>
+    {{ cat_table(s.expense_categories, "No expenses recorded this month.") }}
+  </div>
+  <div class="mx-card overflow-hidden">
+    <h2 class="mx-h2 px-5 pt-5 sm:px-6">Income by category</h2>
+    {{ cat_table(s.income_categories, "No income recorded this month.", "text-mint-700") }}
+  </div>
+</section>
+
+<p class="mt-6 text-sm text-ink-500">
+  <a href="{{ url_for('transactions.index', start=s.start.isoformat(), end=s.end.isoformat()) }}" class="mx-link">See this month's transactions</a>
+  · <a download href="{{ url_for('transactions.export_csv', start=s.start.isoformat(), end=s.end.isoformat()) }}" class="mx-link">Export them as CSV</a>
+</p>
+{% endblock %}

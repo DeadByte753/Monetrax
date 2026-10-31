@@ -1,0 +1,48 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ tx.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <a href="{{ url_for('transactions.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Transactions</a>
+
+  <article class="mx-card mx-tx-detail p-5 sm:p-8" aria-labelledby="tx-title">
+    <div class="flex flex-wrap items-center gap-4">
+      {{ c.cat_icon(tx.category, "lg") }}
+      <div class="min-w-0 flex-[1_1_14rem]">
+        <p class="mx-eyebrow"><i data-lucide="{{ 'arrow-down-left' if tx.is_income else 'arrow-up-right' }}"></i>{{ 'Income' if tx.is_income else 'Expense' }}</p>
+        <h1 id="tx-title" class="mt-1 break-words">{{ tx.name }}</h1>
+      </div>
+      <p class="mx-tx-detail-amount tabular-nums {{ 'text-mint-700' if tx.is_income }}">{{ tx.signed_amount|money(signed=True) }}</p>
+    </div>
+
+    <dl class="mx-detail-list mt-6">
+      <div><dt>Date</dt><dd>{{ tx.date.strftime('%A, %B %d, %Y') }}</dd></div>
+      <div><dt>Amount</dt><dd class="tabular-nums">{{ tx.amount|money }}</dd></div>
+      <div><dt>Type</dt><dd>{{ 'Income' if tx.is_income else 'Expense' }}</dd></div>
+      <div><dt>Category</dt><dd><span class="mx-chip-cat" style="--cat: {{ tx.category.color }}">{{ tx.category.name }}</span></dd></div>
+      <div><dt>{{ 'Received in' if tx.is_income else 'Paid from' }}</dt>
+        <dd>{% if tx.wallet %}<span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background: {{ tx.wallet.color }}"></span>{{ tx.wallet.name }}{% if tx.wallet.archived %} <span class="text-ink-500">(hidden)</span>{% endif %}</span>{% else %}—{% endif %}</dd></div>
+      <div class="is-block"><dt>Description</dt><dd class="whitespace-pre-line break-words">{{ tx.description or '—' }}</dd></div>
+      {% if tx.rule %}
+        <div><dt>Schedule</dt>
+          <dd><a href="{{ url_for('transactions.recurring_edit', rule_id=tx.rule.id) }}" class="mx-link">{{ tx.rule.name }}</a>
+            <span class="block text-xs text-ink-500">{{ tx.rule.frequency_label }}{% if rule_next %} · next {{ rule_next.strftime('%b %d') }}{% elif not tx.rule.active %} · paused{% endif %}</span></dd></div>
+      {% endif %}
+      <div><dt>Added</dt><dd class="text-ink-500">{{ tx.created_at|localtime }}</dd></div>
+      {% if tx.updated_at and tx.created_at and (tx.updated_at - tx.created_at).total_seconds() > 1 %}
+        <div><dt>Last edited</dt><dd class="text-ink-500">{{ tx.updated_at|localtime }}</dd></div>
+      {% endif %}
+    </dl>
+
+    <div class="mx-detail-actions mt-6 border-t border-ink-100 pt-5">
+      {{ c.delete_form(url_for('transactions.delete', tx_id=tx.id), "Delete this transaction?",
+                       "“" ~ tx.name ~ "” (" ~ (tx.amount|money) ~ ") will be removed and your totals will update.",
+                       "Delete", False, url_for('transactions.index')) }}
+      <div class="flex flex-wrap gap-3">
+        <a href="{{ url_for('transactions.duplicate', tx_id=tx.id) }}" class="mx-btn-secondary"><i data-lucide="copy"></i>Duplicate</a>
+        <a href="{{ url_for('transactions.edit', tx_id=tx.id, next=request.path) }}" class="mx-btn-primary"><i data-lucide="pencil"></i>Edit</a>
+      </div>
+    </div>
+  </article>
+</div>
+{% endblock %}

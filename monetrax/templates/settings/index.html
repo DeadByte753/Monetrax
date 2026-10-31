@@ -1,0 +1,184 @@
+{% extends "layouts/app.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+{{ c.page_header("Settings", "Manage your profile, preferences and account.") }}
+
+{% set tabs = [("profile", "Profile", "user"), ("preferences", "Preferences", "sliders-horizontal"),
+               ("categories", "Categories", "tags"), ("security", "Security", "lock"), ("danger", "Delete account", "trash-2")] %}
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+  <nav class="mx-settings-nav" aria-label="Settings sections">
+    {% for key, label, icon in tabs %}
+      <a href="{{ url_for('settings.index', section=key) }}" class="{{ 'is-active' if section == key }}{{ ' is-danger' if key == 'danger' }}"
+         {% if section == key %}aria-current="page"{% endif %}><i data-lucide="{{ icon }}"></i>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <div class="min-w-0">
+  {% if section == "preferences" %}
+    <form method="post" action="{{ url_for('settings.preferences') }}" class="mx-card space-y-6 p-5 sm:p-8">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <h2 class="mx-h2">Preferences</h2>
+        <p class="text-sm text-ink-500">How Monetrax looks, shows amounts and notifies you.</p>
+      </div>
+      {% set opts = [] %}
+      {% for code, info in currencies.items() %}{% set _ = opts.append((code, info[0] ~ "  " ~ info[1] ~ " (" ~ code ~ ")")) %}{% endfor %}
+      <fieldset>
+        <legend class="mx-label">Appearance</legend>
+        <div class="mx-appearance">
+          {% for value, label, icon in [("system", "Match device", "monitor"), ("light", "Light", "sun"), ("dark", "Dark", "moon")] %}
+            <label>
+              <input type="radio" name="theme" value="{{ value }}" data-theme-live {% if (current_user.theme or 'system') == value %}checked{% endif %}>
+              <span class="mx-ap-card">
+                <span class="mx-ap-swatch" aria-hidden="true">
+                  {% if value == "system" %}
+                    <span class="mx-ap-light"><i></i><i></i></span><span class="mx-ap-dark"><i></i><i></i></span>
+                  {% else %}
+                    <span class="mx-ap-{{ value }}"><i></i><i></i><i></i></span>
+                  {% endif %}
+                </span>
+                <span class="mx-ap-label"><i data-lucide="{{ icon }}"></i>{{ label }}</span>
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+        <p class="mx-hint">Changes apply right away. "Match device" follows your phone or computer's setting.</p>
+      </fieldset>
+
+      <div class="max-w-sm">{{ c.select("currency", "Currency", opts, current_user.currency) }}</div>
+
+      <fieldset class="space-y-3">
+        <legend class="mx-label">Notifications</legend>
+        {% for name, title, text in [("budget_alerts", "Budget warnings", "When a budget reaches 75%, 90% and goes over 100%."),
+                                     ("savings_alerts", "Savings milestones", "Halfway and completed goals, and upcoming target dates.")] %}
+          <label class="mx-switch-row">
+            <span><span class="block text-sm font-semibold">{{ title }}</span><span class="block text-[13px] text-ink-500">{{ text }}</span></span>
+            <input type="checkbox" name="{{ name }}" class="mx-switch" {% if current_user[name] %}checked{% endif %}>
+          </label>
+        {% endfor %}
+      </fieldset>
+      <div class="flex justify-end border-t border-ink-100 pt-5"><button class="mx-btn-primary" type="submit"><i data-lucide="check"></i>Save preferences</button></div>
+    </form>
+
+  {% elif section == "categories" %}
+    <div class="mx-card p-5 sm:p-8">
+      <h2 class="mx-h2">Categories</h2>
+      <p class="text-sm text-ink-500">Default categories are built in. Add your own for anything else.</p>
+
+      <form method="post" action="{{ url_for('settings.add_category') }}" class="mt-5 grid grid-cols-1 gap-3 rounded-2xl bg-canvas p-4 sm:grid-cols-[minmax(0,1fr)_160px_auto_auto] sm:items-end" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ c.input("name", "New category", values.cat_name or "", errors.name, placeholder="e.g. Org fees", required=True, maxlength=40) }}
+        {{ c.select("type", "Type", [("expense", "Expense"), ("income", "Income")], values.cat_type or "expense", errors.type) }}
+        <div class="mx-field">
+          <label for="f-color" class="mx-label">Color</label>
+          <input id="f-color" type="color" name="color" value="{{ values.cat_color or colors[0] }}" class="mx-color">
+        </div>
+        <button type="submit" class="mx-btn-primary"><i data-lucide="plus"></i>Add</button>
+      </form>
+
+      {% for group, label in [("expense", "Expense categories"), ("income", "Income categories")] %}
+        <h3 class="mt-7 text-sm font-bold text-ink-500">{{ label }}</h3>
+        <ul class="mt-2 divide-y divide-ink-100 rounded-2xl border border-ink-200">
+          {% for cat, used in categories if cat.type == group %}
+            <li class="flex items-center gap-3 px-4 py-3">
+              {{ c.cat_icon(cat, "sm") }}
+              <span class="flex-1 text-sm font-semibold">{{ cat.name }}</span>
+              <span class="text-xs text-ink-500">{{ used }} transaction{{ 's' if used != 1 }}</span>
+              {% if cat.is_default %}
+                <span class="mx-badge is-neutral">Default</span>
+              {% elif used %}
+                <span class="mx-badge is-neutral" title="Move or delete its transactions first">In use</span>
+              {% else %}
+                {{ c.delete_form(url_for('settings.delete_category', cat_id=cat.id), "Delete this category?",
+                                 "“" ~ cat.name ~ "” and any budget for it will be removed.", "Delete " ~ cat.name) }}
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    </div>
+
+  {% elif section == "security" %}
+    <form method="post" action="{{ url_for('settings.password') }}" class="mx-card space-y-5 p-5 sm:p-8" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <h2 class="mx-h2">Change password</h2>
+        <p class="text-sm text-ink-500">Use at least 8 characters with a letter and a number.</p>
+      </div>
+      <div class="max-w-md space-y-5">
+        {{ c.input("current_password", "Current password", "", errors.current_password, type="password", required=True, autocomplete="current-password") }}
+        {{ c.input("new_password", "New password", "", errors.new_password, type="password", required=True, autocomplete="new-password") }}
+        {{ c.input("confirm_password", "Confirm new password", "", errors.confirm_password, type="password", required=True, autocomplete="new-password") }}
+      </div>
+      <div class="flex justify-end border-t border-ink-100 pt-5"><button class="mx-btn-primary" type="submit"><i data-lucide="key-round"></i>Update password</button></div>
+    </form>
+    <div class="mx-card mt-6 p-5 sm:p-8">
+      <h2 class="mx-h2">Session</h2>
+      <p class="mt-1 text-sm text-ink-500">
+        Signed in as <span class="font-semibold text-navy-900">{{ current_user.email }}</span>.
+        {% if current_user.last_login_at %}Last sign-in {{ current_user.last_login_at|localtime }}.{% endif %}
+      </p>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="mt-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="mx-btn-ghost"><i data-lucide="log-out"></i>Log out</button>
+      </form>
+    </div>
+
+  {% elif section == "danger" %}
+    <form method="post" action="{{ url_for('settings.reset_data') }}" class="mx-card mx-danger-card mb-6 space-y-5 p-5 sm:p-8" novalidate
+          data-confirm-title="Reset all financial data?" data-confirm-ok="Reset data"
+          data-confirm="Every transaction, recurring schedule, transfer, budget and savings goal will be deleted and wallet starting balances set to zero. Your account, wallets and categories stay. This can't be undone.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <h2 class="mx-h2 text-[#B42318]">Reset financial data</h2>
+        <p class="mt-1 text-sm text-ink-500">Start over with a clean slate. Deletes all transactions, recurring schedules, wallet transfers, budgets, savings goals and notifications, and sets wallet starting balances to zero. Your account, wallets and categories are kept.</p>
+        <p class="mt-2 text-sm text-ink-500">Want a copy first? <a download href="{{ url_for('transactions.export_csv') }}" class="mx-link">Export your transactions as CSV</a>.</p>
+      </div>
+      <div class="max-w-md space-y-5">
+        {{ c.input("reset_password", "Your password", "", errors.reset_password, type="password", required=True, autocomplete="current-password") }}
+        {{ c.input("reset_confirm", "Type RESET to confirm", "", errors.reset_confirm, required=True, autocomplete="off") }}
+      </div>
+      <div class="flex justify-end border-t border-ink-100 pt-5"><button class="mx-btn-danger" type="submit"><i data-lucide="rotate-ccw"></i>Reset financial data</button></div>
+    </form>
+
+    <form method="post" action="{{ url_for('settings.delete_account') }}" class="mx-card mx-danger-card space-y-5 p-5 sm:p-8" novalidate
+          data-confirm-title="Delete your account?" data-confirm-ok="Delete account"
+          data-confirm="Your profile and all of your data will be permanently deleted and you'll be signed out. This can't be undone.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <h2 class="mx-h2 text-[#B42318]">Delete your account</h2>
+        <p class="mt-1 text-sm text-ink-500">This permanently deletes your profile, transactions, budgets, savings goals and notifications. It can't be undone.</p>
+      </div>
+      <div class="max-w-md space-y-5">
+        {{ c.input("password", "Your password", "", errors.delete_password, type="password", required=True, autocomplete="current-password") }}
+        {{ c.input("confirm", "Type DELETE to confirm", "", errors.delete_confirm, required=True, autocomplete="off") }}
+      </div>
+      <div class="flex justify-end border-t border-ink-100 pt-5"><button class="mx-btn-danger" type="submit"><i data-lucide="trash-2"></i>Delete account permanently</button></div>
+    </form>
+
+  {% else %}
+    <form method="post" action="{{ url_for('settings.profile') }}" class="mx-card space-y-5 p-5 sm:p-8" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="flex items-center gap-4">
+        <span class="mx-avatar mx-avatar-lg">{{ current_user.initials }}</span>
+        <div>
+          <h2 class="mx-h2">Student profile</h2>
+          <p class="text-sm text-ink-500">Member since {{ current_user.created_at.strftime('%B %Y') }}</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {{ c.input("full_name", "Full name", values.full_name or current_user.full_name, errors.full_name, required=True, autocomplete="name", maxlength=80) }}
+        {{ c.input("email", "Student email", values.email or current_user.email, errors.email, type="email", required=True, autocomplete="email") }}
+        {{ c.input("school", "School", values.school or current_user.school or "", None, placeholder="e.g. Aklan State University", maxlength=120) }}
+        {{ c.input("program", "Program / course", values.program or current_user.program or "", None, placeholder="e.g. BS Accountancy", maxlength=120) }}
+        {% set yl = [] %}{% for y in year_levels %}{% set _ = yl.append((y, y)) %}{% endfor %}
+        {{ c.select("year_level", "Year level", yl, values.year_level or current_user.year_level or "", None, placeholder="Select year level", required=False) }}
+      </div>
+      <div class="flex justify-end border-t border-ink-100 pt-5"><button class="mx-btn-primary" type="submit"><i data-lucide="check"></i>Save profile</button></div>
+    </form>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

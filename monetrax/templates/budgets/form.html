@@ -1,0 +1,40 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ 'Edit budget' if budget else 'New budget' }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-xl">
+  <a href="{{ url_for('budgets.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Budgets</a>
+  {{ c.page_header('Edit budget' if budget else 'New budget', 'Limits reset automatically at the start of each week or month.') }}
+
+  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% set opts = [] %}
+    {% for cat in categories %}{% set _ = opts.append((cat.id, cat.name)) %}{% endfor %}
+    {{ c.select("category_id", "Expense category", opts, values.category_id, errors.category_id, placeholder="Choose a category") }}
+
+    {{ c.input("limit_amount", "Spending limit", values.limit_amount, errors.limit_amount, prefix=currency_symbol,
+               placeholder="0.00", inputmode="decimal", required=True, extra="data-money") }}
+
+    <fieldset>
+      <legend class="mx-label">Budget period</legend>
+      <div class="mx-segment" role="radiogroup">
+        <label class="mx-segment-opt is-neutral">
+          <input type="radio" name="period" value="weekly" {% if values.period == 'weekly' %}checked{% endif %}>
+          <span><i data-lucide="calendar-days"></i>Weekly</span>
+        </label>
+        <label class="mx-segment-opt is-neutral">
+          <input type="radio" name="period" value="monthly" {% if values.period != 'weekly' %}checked{% endif %}>
+          <span><i data-lucide="calendar"></i>Monthly</span>
+        </label>
+      </div>
+      {{ c.error_text("period", errors.period) }}
+      <p class="mx-hint">Weekly budgets run Monday to Sunday.</p>
+    </fieldset>
+
+    <div class="flex justify-end border-t border-ink-100 pt-5">
+      <button type="submit" class="mx-btn-primary mx-btn-lg"><i data-lucide="check"></i>{{ 'Save changes' if budget else 'Create budget' }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ 'Edit goal' if goal else 'New goal' }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-xl">
+  <a href="{{ url_for('savings.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Savings goals</a>
+  {{ c.page_header('Edit goal' if goal else 'New savings goal', 'Give it a name, a target, and optionally a date.') }}
+
+  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {{ c.input("name", "Goal name", values.name, errors.name, placeholder="e.g. New laptop", required=True, maxlength=80) }}
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {{ c.input("target_amount", "Target amount", values.target_amount, errors.target_amount, prefix=currency_symbol,
+                 placeholder="0.00", inputmode="decimal", required=True, extra="data-money") }}
+      {{ c.input("target_date", "Target date", values.target_date, errors.target_date, type="date") }}
+    </div>
+
+    {% if not goal %}
+      {{ c.input("initial_amount", "Already saved", values.initial_amount, errors.initial_amount, prefix=currency_symbol,
+                 placeholder="0.00", inputmode="decimal", hint="Money you've already set aside for this goal.", extra="data-money") }}
+    {% endif %}
+
+    <fieldset>
+      <legend class="mx-label">Icon</legend>
+      <div class="flex flex-wrap gap-2">
+        {% for icon in icons %}
+          <label class="mx-icon-pick">
+            <input type="radio" name="icon" value="{{ icon }}" {% if values.icon == icon %}checked{% endif %}>
+            <span><i data-lucide="{{ icon }}"></i><span class="sr-only">{{ icon|replace('-', ' ') }}</span></span>
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="flex justify-end border-t border-ink-100 pt-5">
+      <button type="submit" class="mx-btn-primary mx-btn-lg"><i data-lucide="check"></i>{{ 'Save changes' if goal else 'Create goal' }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

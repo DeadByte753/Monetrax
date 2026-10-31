@@ -1,0 +1,7 @@
+<nav class="mx-tabs mb-8" data-active="{{ active }}" aria-label="Account">
+  <span class="mx-tab-pill" aria-hidden="true"></span>
+  <a href="{{ url_for('auth.login') }}" class="mx-tab" data-tab="login" data-transition
+     {% if active == 'login' %}aria-current="page"{% endif %}>Sign in</a>
+  <a href="{{ url_for('auth.register') }}" class="mx-tab" data-tab="register" data-transition
+     {% if active == 'register' %}aria-current="page"{% endif %}>Create account</a>
+</nav>

@@ -1,0 +1,115 @@
+{% extends "layouts/app.html" %}
+{% block title %}Wallets{% endblock %}
+
+{% block content %}
+{% call c.page_header("Wallets", "Where your money is right now: cash, e-wallets and bank accounts.") %}
+  {% if active|length > 1 %}<a href="{{ url_for('wallets.transfer') }}" class="mx-btn-secondary"><i data-lucide="arrow-right-left"></i>Move money</a>{% endif %}
+  <a href="{{ url_for('wallets.form') }}" class="mx-btn-primary"><i data-lucide="plus"></i>Add wallet</a>
+{% endcall %}
+
+<section class="grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Wallet totals">
+  {{ c.stat_card("Total in wallets", total|money, "wallet", "mint",
+                 ("Includes " ~ (opening|money) ~ " you had before Monetrax") if opening else "Across all your wallets") }}
+  {{ c.stat_card("Spendable now", spendable|money, "hand-coins", "navy", "Counted in Safe to spend today") }}
+  {{ c.stat_card("Wallets", active|length, "layers", "blue", (hidden|length ~ " hidden") if hidden else None) }}
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Your wallets">
+  {% for b in active %}
+    {% set w = b.wallet %}
+    <article class="mx-card mx-wallet p-5" style="--cat: {{ w.color }}">
+      <div class="flex items-start gap-3">
+        <span class="mx-cat mx-cat-lg" aria-hidden="true"><i data-lucide="{{ w.icon }}"></i></span>
+        <div class="min-w-0 flex-1">
+          <h2 class="truncate text-base font-bold">{{ w.name }}</h2>
+          <p class="text-xs text-ink-500">{{ w.type_label }}</p>
+        </div>
+        {% if not w.spendable %}<span class="mx-badge is-neutral" title="Not counted in Safe to spend today">Not for spending</span>{% endif %}
+      </div>
+      <p class="mt-5 text-[1.75rem] font-extrabold tabular-nums {{ 'text-[#B42318]' if b.is_negative }}" data-count>{{ b.balance|money }}</p>
+      {% if b.is_negative %}
+        <p class="mt-1 text-[13px] text-[#B42318]">Below zero. A transaction may be in the wrong wallet, or income wasn't recorded.</p>
+      {% else %}
+        <p class="mt-1 text-[13px] text-ink-500 tabular-nums">This month: <span class="text-mint-700">+{{ b.month_in|money }}</span> · −{{ b.month_out|money }}</p>
+      {% endif %}
+      <div class="mt-4 flex items-center justify-between border-t border-ink-100 pt-3">
+        <a href="{{ url_for('transactions.index', wallet=w.id) }}" class="mx-link text-sm">View transactions</a>
+        <div class="flex gap-1">
+          {% if active|length > 1 %}
+            <a href="{{ url_for('wallets.transfer', **{'from': w.id}) }}" class="mx-icon-btn-sm" aria-label="Move money from {{ w.name }}" title="Move money"><i data-lucide="arrow-right-left"></i></a>
+          {% endif %}
+          <a href="{{ url_for('wallets.form', wallet_id=w.id) }}" class="mx-icon-btn-sm" aria-label="Edit {{ w.name }}" title="Edit"><i data-lucide="pencil"></i></a>
+          {% if active|length > 1 %}
+            <form method="post" action="{{ url_for('wallets.hide', wallet_id=w.id) }}" data-confirm-title="Remove {{ w.name }}?"
+                  data-confirm="{{ 'Wallets with history are hidden, not deleted, so your past transactions stay accurate.' if b.balance == 0 else 'It still holds ' ~ (b.balance|money) ~ '. Move that money first, or it will no longer count in your totals.' }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="mx-icon-btn-sm is-danger" aria-label="Remove {{ w.name }}" title="Remove"><i data-lucide="archive"></i></button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+  {% endfor %}
+  <a href="{{ url_for('wallets.form') }}" class="mx-card mx-wallet-add">
+    <span class="mx-tile mx-tile-mint" aria-hidden="true"><i data-lucide="plus"></i></span>
+    <span class="text-sm font-semibold">Add a wallet</span>
+    <span class="text-xs text-ink-500">Maya, a bank account, a prepaid card</span>
+  </a>
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+  <div class="mx-card xl:col-span-2">
+    <div class="flex items-center justify-between px-5 pt-5 sm:px-6">
+      <h2 class="mx-h2">Recent transfers</h2>
+      {% if active|length > 1 %}<a href="{{ url_for('wallets.transfer') }}" class="mx-link text-sm">Move money</a>{% endif %}
+    </div>
+    {% if transfers %}
+      <ul class="mt-2 divide-y divide-ink-100">
+        {% for t in transfers %}
+          <li class="flex items-center gap-3 px-5 py-3.5 sm:px-6">
+            <span class="mx-tile mx-tile-navy h-9 w-9" aria-hidden="true"><i data-lucide="arrow-right-left"></i></span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-semibold">{{ t.from_wallet.name }} → {{ t.to_wallet.name }}</p>
+              <p class="text-xs text-ink-500">{{ t.date.strftime('%b %d, %Y') }}{% if t.note %} · {{ t.note }}{% endif %}</p>
+            </div>
+            <span class="font-bold tabular-nums">{{ t.amount|money }}</span>
+            {{ c.delete_form(url_for('wallets.delete_transfer', transfer_id=t.id), "Remove this transfer?",
+                             "Both wallet balances will be recalculated.", "Remove transfer") }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="px-5 pb-6 pt-2 text-sm text-ink-500 sm:px-6">No transfers yet. Use <span class="font-semibold text-navy-900">Move money</span> for things like cashing in to GCash or withdrawing from the bank. Transfers don't count as income or spending.</p>
+    {% endif %}
+  </div>
+
+  <div class="mx-card p-5 sm:p-6">
+    <h2 class="mx-h2">How balances work</h2>
+    <ul class="mt-3 space-y-2.5 text-sm leading-6 text-ink-500">
+      <li class="flex gap-2"><i data-lucide="plus" class="mt-1 h-4 w-4 flex-none text-mint-700"></i>Income adds to the wallet it went into.</li>
+      <li class="flex gap-2"><i data-lucide="minus" class="mt-1 h-4 w-4 flex-none"></i>Expenses come out of the wallet you paid from.</li>
+      <li class="flex gap-2"><i data-lucide="arrow-right-left" class="mt-1 h-4 w-4 flex-none"></i>Transfers move money without changing your totals.</li>
+      <li class="flex gap-2"><i data-lucide="hand-coins" class="mt-1 h-4 w-4 flex-none"></i><span>Turn off <span class="font-semibold text-navy-900">Use for daily spending</span> on money you don't touch, like a savings account.</span></li>
+    </ul>
+  </div>
+</section>
+
+{% if hidden %}
+  <details class="mx-details mt-6">
+    <summary>Hidden wallets ({{ hidden|length }})</summary>
+    <ul class="mx-card mt-2 divide-y divide-ink-100">
+      {% for b in hidden %}
+        <li class="flex items-center gap-3 px-5 py-3" style="--cat: {{ b.wallet.color }}">
+          <span class="mx-cat mx-cat-sm" aria-hidden="true"><i data-lucide="{{ b.wallet.icon }}"></i></span>
+          <span class="flex-1 text-sm font-semibold">{{ b.wallet.name }}</span>
+          <span class="text-sm tabular-nums text-ink-500">{{ b.balance|money }}</span>
+          <form method="post" action="{{ url_for('wallets.restore', wallet_id=b.wallet.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="mx-btn-ghost mx-btn-sm"><i data-lucide="undo-2"></i>Restore</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}
+{% endblock %}

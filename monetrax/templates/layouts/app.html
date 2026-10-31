@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% import "components/_ui.html" as ui %}
+{% import "components/_app.html" as c %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+{% endblock %}
+
+{% block body %}
+<div class="min-h-full lg:pl-72">
+
+  <div class="mx-scrim" data-sidebar-scrim hidden></div>
+  <aside id="sidebar" class="mx-sidebar" aria-label="Main navigation">
+    <div class="flex h-16 flex-none items-center justify-between px-6">
+      <a href="{{ url_for('dashboard.index') }}" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint-400">{{ ui.logo("light", 32) }}</a>
+      <span class="flex lg:hidden"><button type="button" class="mx-side-close" data-sidebar-close aria-label="Close menu"><i data-lucide="x"></i></button></span>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-4 pb-4 pt-2">
+      <p class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/40">Menu</p>
+      <ul class="space-y-1">
+        {% for endpoint, label, icon in nav_items %}
+          {% set active = request.endpoint and request.endpoint.split('.')[0] == endpoint.split('.')[0] %}
+          <li>
+            <a href="{{ url_for(endpoint) }}" class="mx-nav{% if active %} is-active{% endif %}" {% if active %}aria-current="page"{% endif %}>
+              <i data-lucide="{{ icon }}"></i><span>{{ label }}</span>
+              {% if endpoint == 'notifications.index' and unread_notifications %}
+                <span class="mx-nav-badge" aria-label="{{ unread_notifications }} unread">{{ unread_notifications if unread_notifications < 100 else '99+' }}</span>
+              {% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <div class="flex-none border-t border-white/10 p-4">
+      <a href="{{ url_for('settings.index', section='profile') }}" class="mx-profile">
+        <span class="mx-avatar">{{ current_user.initials }}</span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-sm font-semibold text-white">{{ current_user.full_name }}</span>
+          <span class="block truncate text-xs text-white/55">{{ current_user.school or current_user.email }}</span>
+        </span>
+      </a>
+      <div class="mt-2 grid grid-cols-2 gap-2">
+        <a href="{{ url_for('settings.index', section='security') }}" class="mx-side-btn"><i data-lucide="user-cog"></i>Account</a>
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="mx-side-btn w-full"><i data-lucide="log-out"></i>Log out</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <header class="mx-topbar sticky top-0 z-30 border-b border-ink-200/70 bg-canvas/85 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <span class="flex flex-none lg:hidden">
+        <button type="button" class="mx-icon-square" data-sidebar-open aria-controls="sidebar" aria-expanded="false" aria-label="Open menu">
+          <i data-lucide="menu"></i>
+        </button>
+      </span>
+      <p class="min-w-0 flex-1 truncate text-sm font-medium text-ink-500"><span class="hidden sm:inline">{{ today.strftime('%A, ') if today }}</span>{{ today.strftime('%B %d, %Y') if today }}</p>
+      <div class="ml-auto flex flex-none items-center gap-2">
+        <span class="hidden sm:flex"><a href="{{ url_for('transactions.create', next=request.path) }}" class="mx-btn-primary"><i data-lucide="plus"></i>Add transaction</a></span>
+        <span class="flex sm:hidden"><a href="{{ url_for('transactions.create', next=request.path) }}" class="mx-icon-square" aria-label="Add transaction"><i data-lucide="plus"></i></a></span>
+        <button type="button" class="mx-theme-toggle" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Dark mode">
+          <i data-lucide="moon" class="mx-icon-moon"></i><i data-lucide="sun" class="mx-icon-sun"></i>
+        </button>
+        <a href="{{ url_for('notifications.index') }}" class="mx-icon-square relative" aria-label="Notifications{% if unread_notifications %}, {{ unread_notifications }} unread{% endif %}">
+          <i data-lucide="bell"></i>
+          {% if unread_notifications %}<span class="mx-dot" aria-hidden="true"></span>{% endif %}
+        </a>
+        <a href="{{ url_for('settings.index') }}" class="mx-avatar mx-avatar-sm" aria-label="Settings">{{ current_user.initials }}</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="mx-app-main mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-6 space-y-3">
+          {% for category, message in messages %}{{ ui.alert(category if category in ("success","error","info") else "info", message) }}{% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<dialog id="confirm-dialog" class="mx-dialog" aria-labelledby="confirm-title">
+  <div class="flex items-start gap-4">
+    <span class="grid h-11 w-11 flex-none place-items-center rounded-2xl bg-[#FEF3F2] text-[#B42318]"><i data-lucide="trash-2"></i></span>
+    <div>
+      <h3 id="confirm-title" class="text-lg font-bold" data-confirm-title>Are you sure?</h3>
+      <p class="mt-1 text-sm leading-6 text-ink-500" data-confirm-text>This can't be undone.</p>
+    </div>
+  </div>
+  <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+    <button type="button" class="mx-btn-ghost" data-confirm-cancel>Cancel</button>
+    <button type="button" class="mx-btn-danger" data-confirm-ok>Delete</button>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% block page_scripts %}{% endblock %}
+{% endblock %}

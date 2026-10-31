@@ -1,0 +1,267 @@
+{% extends "layouts/app.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+{% set m = ov.month %}
+{% set a = ov.all_time %}
+
+{% call c.page_header(greeting ~ ", " ~ current_user.first_name ~ "!", "Here's where your money stands today.") %}
+  <a href="{{ url_for('transactions.create', type='income', next=request.path) }}" class="mx-btn-secondary"><i data-lucide="wallet"></i>Add allowance</a>
+{% endcall %}
+
+<section class="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-3" aria-label="Today">
+  <div class="mx-card mx-safe is-{{ safe.status }} p-5 sm:p-7 xl:col-span-2">
+    {% if not safe.has_data %}
+      <div class="mx-safe-setup">
+        <span class="mx-tile mx-tile-mint h-14 w-14 rounded-2xl" aria-hidden="true"><i data-lucide="hand-coins"></i></span>
+        <div class="mx-safe-setup-text">
+          <h2 class="mx-h2">Safe to spend today</h2>
+          <p class="mt-1 text-sm leading-6 text-ink-500">Tell Monetrax how much is in your wallets and when your allowance comes, and it will work out how much you can spend each day.</p>
+        </div>
+        <div class="mx-safe-setup-actions">
+          <a href="{{ url_for('wallets.index') }}" class="mx-btn-secondary">Set wallet balances</a>
+          <a href="{{ url_for('transactions.recurring_new', type='income') }}" class="mx-btn-primary">Set up allowance</a>
+        </div>
+      </div>
+    {% else %}
+      <div class="mx-safe-body">
+        <div class="mx-safe-main">
+          <p class="mx-eyebrow"><i data-lucide="hand-coins"></i>Safe to spend today</p>
+          {% if safe.status == 'empty' %}
+            <p class="mx-safe-amount">{{ 0|money }}</p>
+            <p class="mt-2 max-w-md text-sm leading-6 text-ink-500">
+              {% if safe.set_aside > 0 %}Your upcoming bills need what's in your wallets until {{ safe.until.strftime('%b %d') }}.
+              {% else %}Your spendable wallets are empty until {{ safe.until.strftime('%b %d') }}.{% endif %}
+              Add income you've received, or check your wallet balances.
+            </p>
+          {% else %}
+            <p class="mx-safe-amount {{ 'is-negative' if safe.left_today < 0 }}" data-count>{{ (safe.left_today if safe.left_today >= 0 else -safe.left_today)|money }}</p>
+            <p class="mt-1 text-sm font-semibold {{ 'text-[#B42318]' if safe.status == 'over' else 'text-ink-500' }}">
+              {% if safe.status == 'over' %}over today's amount. Tomorrow's will adjust.
+              {% elif safe.spent_today > 0 %}left today, of {{ safe.daily|money }}
+              {% else %}you can spend today{% endif %}
+            </p>
+            <div class="mt-4 max-w-md">
+              {{ c.progress(safe.percent_used, {'ok': 'ok', 'close': 'warning', 'over': 'over'}[safe.status], "Spent of today's safe amount") }}
+              <p class="mt-2 text-[13px] text-ink-500 tabular-nums">Spent today: <span class="font-semibold text-navy-900">{{ safe.spent_today|money }}</span></p>
+            </div>
+          {% endif %}
+          <p class="mt-4 text-[13px] leading-5 text-ink-500">
+            {% if safe.basis == 'income' %}
+              {{ safe.daily|money }} a day for {{ safe.days }} day{{ 's' if safe.days != 1 }}, until your
+              <span class="font-semibold text-navy-900">{{ safe.next_income_name }}</span> on {{ safe.until.strftime('%a, %b %d') }}.
+            {% else %}
+              {{ safe.daily|money }} a day until the end of {{ today.strftime('%B') }}.
+              <a href="{{ url_for('transactions.recurring_new', type='income') }}" class="mx-link">Add your allowance schedule</a> to plan around payday instead.
+            {% endif %}
+          </p>
+        </div>
+
+        <dl class="mx-safe-math">
+          <div><dt>In spendable wallets</dt><dd>{{ safe.spendable_balance|money }}</dd></div>
+          <div><dt>Set aside for bills</dt><dd>{{ ('−' ~ (safe.set_aside|money)) if safe.set_aside else (0|money) }}</dd></div>
+          <div><dt>Days until {{ 'allowance' if safe.basis == 'income' else 'month ends' }}</dt><dd>{{ safe.days }}</dd></div>
+          {% if safe.bills %}
+            <div class="mx-safe-bills">
+              <dt>Coming up</dt>
+              <dd>
+                <ul>
+                  {% for r, d in safe.bills[:4] %}
+                    <li><span>{{ d.strftime('%b %d') }} · {{ r.name }}</span><span class="tabular-nums">{{ r.amount|money }}</span></li>
+                  {% endfor %}
+                  {% if safe.bills|length > 4 %}<li class="text-ink-500">+ {{ safe.bills|length - 4 }} more</li>{% endif %}
+                </ul>
+              </dd>
+            </div>
+          {% endif %}
+        </dl>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="mx-card p-5 sm:p-6">
+    <div class="flex items-center justify-between">
+      <h2 class="mx-h2">Wallets</h2>
+      <a href="{{ url_for('wallets.index') }}" class="mx-link text-sm">Manage</a>
+    </div>
+    <ul class="mx-stagger mt-3 divide-y divide-ink-100">
+      {% for b in wallets %}
+        <li class="flex items-center gap-3 py-2.5" style="--cat: {{ b.wallet.color }}">
+          <span class="mx-cat mx-cat-sm" aria-hidden="true"><i data-lucide="{{ b.wallet.icon }}"></i></span>
+          <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ b.wallet.name }}{% if not b.wallet.spendable %} <span class="text-xs text-ink-500">· savings</span>{% endif %}</span>
+          <span class="text-sm font-bold tabular-nums {{ 'text-[#B42318]' if b.is_negative }}">{{ b.balance|money }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if wallets|length > 1 %}
+      <a href="{{ url_for('wallets.transfer') }}" class="mx-btn-ghost mx-btn-sm mt-3 w-full"><i data-lucide="arrow-right-left"></i>Move money</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Summary">
+  {{ c.stat_card("Total Allowance", a.income|money, "wallet", "mint", "+" ~ (m.income|money) ~ " this month") }}
+  {{ c.stat_card("Total Expenses", a.expense|money, "receipt", "navy", (m.expense|money) ~ " this month") }}
+  {{ c.stat_card("Remaining Balance", a.balance|money, "scale", "blue",
+                 ("Income minus expenses" if a.balance >= 0 else "You've spent more than you received"),
+                 None if a.balance >= 0 else "down") }}
+  {{ c.stat_card("Total Savings", ov.savings|money, "piggy-bank", "violet",
+                 (goals|length ~ " goal" ~ ("s" if goals|length != 1 else "")) if goals else "No goals yet") }}
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3" aria-label="Financial overview">
+  <div class="mx-card p-5 sm:p-6 xl:col-span-2">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h2 class="mx-h2">Income vs expenses</h2>
+        <p class="text-sm text-ink-500">Last 6 months</p>
+      </div>
+      <div class="flex items-center gap-4 text-xs font-medium text-ink-500">
+        <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-mint-500"></span>Income</span>
+        <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm" style="background: var(--chart-expense)"></span>Expenses</span>
+      </div>
+    </div>
+    <div class="mx-chart mt-4 h-72"><canvas data-chart="incomeExpense" data-source="dash-data" role="img" aria-label="Bar chart of monthly income and expenses for the last six months"></canvas></div>
+  </div>
+
+  <div class="mx-card p-5 sm:p-6">
+    <h2 class="mx-h2">Spending by category</h2>
+    <p class="text-sm text-ink-500">{{ ov.month_start.strftime('%B') }}</p>
+    {% if categories %}
+      <div class="mx-chart relative mx-auto mt-4 h-44 w-44">
+        <canvas data-chart="categories" data-source="dash-data" role="img" aria-label="Doughnut chart of this month's spending by category"></canvas>
+        <div class="pointer-events-none absolute inset-0 grid place-content-center text-center">
+          <p class="text-lg font-extrabold tabular-nums" data-count>{{ m.expense|cmoney }}</p><p class="text-[11px] text-ink-500">spent</p>
+        </div>
+      </div>
+      <ul class="mt-5 space-y-2.5">
+        {% for cat in categories %}
+          <li class="flex items-center gap-3 text-sm">
+            <span class="h-2.5 w-2.5 flex-none rounded-full" style="background: {{ cat.color }}"></span>
+            <span class="flex-1 truncate">{{ cat.name }}</span>
+            <span class="text-ink-500 tabular-nums">{{ cat.share|round|int }}%</span>
+            <span class="w-24 text-right font-semibold tabular-nums">{{ cat.total|money }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ c.empty_state("chart-pie", "No spending yet this month", "Log an expense to see where your money goes.") }}
+    {% endif %}
+  </div>
+
+  <div class="mx-card p-5 sm:p-6 xl:col-span-3">
+    <div class="flex flex-wrap items-end justify-between gap-2">
+      <div>
+        <h2 class="mx-h2">Monthly spending trend</h2>
+        <p class="text-sm text-ink-500">Daily expenses in {{ ov.month_start.strftime('%B') }}</p>
+      </div>
+      {% set prev = ov.prev_month.expense %}
+      <p class="text-sm text-ink-500">Last month: <span class="font-semibold text-navy-900">{{ prev|money }}</span></p>
+    </div>
+    <div class="mx-chart mt-4 h-56"><canvas data-chart="trend" data-source="dash-data" role="img" aria-label="Line chart of daily spending this month"></canvas></div>
+  </div>
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+
+  <div class="mx-card xl:col-span-2">
+    <div class="flex items-center justify-between px-5 pt-5 sm:px-6">
+      <h2 class="mx-h2">Recent transactions</h2>
+      <a href="{{ url_for('transactions.index') }}" class="mx-link text-sm">View All Transactions</a>
+    </div>
+    {% if recent %}
+      <ul class="mx-stagger mt-2 divide-y divide-ink-100">
+        {% for t in recent %}
+          <li class="flex items-center gap-3 px-5 py-3.5 sm:px-6">
+            {{ c.cat_icon(t.category) }}
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-semibold"><a href="{{ url_for('transactions.detail', tx_id=t.id) }}" class="hover:underline">{{ t.name }}</a></p>
+              <p class="text-xs text-ink-500">{{ t.category.name }} · {{ t.date.strftime('%b %d, %Y') }}</p>
+            </div>
+            {{ c.tx_amount(t) }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ c.empty_state("receipt", "No transactions yet", "Start by adding your allowance, then log what you spend.",
+                       url_for('transactions.create', type='income'), "Add your first transaction") }}
+    {% endif %}
+  </div>
+
+  <div class="mx-card mx-insights p-5 sm:p-6">
+    <div class="flex items-center gap-2">
+      <span class="mx-tile mx-tile-mint h-8 w-8" aria-hidden="true"><i data-lucide="sparkles"></i></span>
+      <h2 class="mx-h2">Monetrax Insights</h2>
+    </div>
+    <ul class="mx-stagger mt-4 space-y-3">
+      {% for i in insights %}
+        <li class="mx-insight is-{{ i.level }}">
+          <i data-lucide="{{ i.icon }}" aria-hidden="true"></i>
+          <div><p class="text-sm font-semibold">{{ i.title }}</p><p class="mt-0.5 text-[13px] leading-5 text-ink-500">{{ i.text }}</p></div>
+        </li>
+      {% else %}
+        <li class="text-sm text-ink-500">You're on track. Keep logging transactions for more tips.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="mx-card p-5 sm:p-6 xl:col-span-2">
+    <div class="flex items-center justify-between">
+      <h2 class="mx-h2">Budget overview</h2>
+      <a href="{{ url_for('budgets.index') }}" class="mx-link text-sm">Manage budgets</a>
+    </div>
+    {% if budgets %}
+      <ul class="mx-stagger mt-4 space-y-4">
+        {% for s in budgets %}
+          <li class="{{ 'mx-budget-alert' if s.level != 'ok' }}">
+            <div class="flex items-center gap-3">
+              {{ c.cat_icon(s.budget.category, "sm") }}
+              <div class="min-w-0 flex-1">
+                <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
+                  <span class="truncate">{{ s.budget.category.name }} <span class="font-normal text-ink-500">· {{ s.budget.period }}</span></span>
+                  {% if s.level != 'ok' %}{{ c.level_badge(s.level, s.percent) }}{% endif %}
+                </p>
+              </div>
+              <p class="flex-none text-right text-sm tabular-nums"><span class="font-semibold">{{ s.spent|money }}</span><span class="block text-xs text-ink-500 sm:inline sm:text-sm"> / {{ s.budget.limit_amount|money }}</span></p>
+            </div>
+            <div class="mt-2">{{ c.progress(s.percent, s.level, s.budget.category.name ~ " budget used") }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if budget_count > budgets|length %}<p class="mt-4 text-sm text-ink-500">+ {{ budget_count - budgets|length }} more on the Budgets page</p>{% endif %}
+    {% else %}
+      {{ c.empty_state("wallet-cards", "No budgets yet", "Set a weekly or monthly limit for a category to get warnings before you overspend.",
+                       url_for('budgets.create'), "Create a budget") }}
+    {% endif %}
+  </div>
+
+  <div class="mx-card p-5 sm:p-6">
+    <div class="flex items-center justify-between">
+      <h2 class="mx-h2">Savings goals</h2>
+      <a href="{{ url_for('savings.index') }}" class="mx-link text-sm">View all</a>
+    </div>
+    {% if goals %}
+      <ul class="mx-stagger mt-4 space-y-5">
+        {% for g in goals %}
+          <li>
+            <div class="flex items-center gap-3">
+              <span class="mx-tile mx-tile-mint h-9 w-9" aria-hidden="true"><i data-lucide="{{ g.icon }}"></i></span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-semibold">{{ g.name }}</p>
+                <p class="text-xs text-ink-500 tabular-nums">{{ g.saved_amount|money }} of {{ g.target_amount|money }}</p>
+              </div>
+              <span class="text-sm font-bold tabular-nums {{ 'text-mint-700' if g.is_complete }}">{{ g.percent|round|int }}%</span>
+            </div>
+            <div class="mt-2">{{ c.progress(g.percent, "goal", g.name ~ " progress") }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ c.empty_state("target", "No savings goals", "Pick something to save for and track your progress.",
+                       url_for('savings.form'), "Create a goal") }}
+    {% endif %}
+  </div>
+</section>
+
+{{ c.chart_data("dash-data", charts) }}
+{% endblock %}

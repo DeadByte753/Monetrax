@@ -1,0 +1,91 @@
+{% extends "layouts/app.html" %}
+{% block title %}Recurring{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('transactions.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Transactions</a>
+{% call c.page_header("Recurring", "Allowance, bills and subscriptions that Monetrax adds for you on schedule.") %}
+  <a href="{{ url_for('transactions.recurring_new', type='expense') }}" class="mx-btn-secondary"><i data-lucide="plus"></i>Recurring bill</a>
+  <a href="{{ url_for('transactions.recurring_new', type='income') }}" class="mx-btn-primary"><i data-lucide="plus"></i>Recurring allowance</a>
+{% endcall %}
+
+{% if rows %}
+  <section class="grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Monthly estimate">
+    {{ c.stat_card("Expected income / month", monthly_in|money, "arrow-down-left", "mint", "From active recurring income") }}
+    {{ c.stat_card("Bills & subscriptions / month", monthly_out|money, "arrow-up-right", "navy", "From active recurring expenses") }}
+    {{ c.stat_card("Left after bills / month", (monthly_in - monthly_out)|money, "scale", "blue", "An estimate, before everyday spending") }}
+  </section>
+
+  <h2 class="mx-h2 mb-3 mt-8">Upcoming · next {{ upcoming_days }} days</h2>
+  <section class="mx-card overflow-hidden" aria-label="Upcoming recurring transactions">
+    {% if upcoming %}
+      <ul class="divide-y divide-ink-100">
+        {% for r, d in upcoming %}
+          <li class="flex items-center gap-3 px-4 py-3 sm:px-6">
+            <span class="w-16 flex-none text-xs font-semibold uppercase text-ink-500 tabular-nums">{{ d.strftime('%a') }}<span class="block text-sm text-navy-900">{{ d.strftime('%b %d') }}</span></span>
+            {{ c.cat_icon(r.category, "sm") }}
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold">{{ r.name }}<span class="block text-xs font-normal text-ink-500">{{ r.frequency_label }}{% if r.wallet %} · {{ r.wallet.name }}{% endif %}</span></span>
+            <span class="flex-none text-sm font-bold tabular-nums {{ 'text-mint-700' if r.is_income }}">{{ ('+' if r.is_income else '−') ~ (r.amount|money) }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if upcoming_total > upcoming|length %}<p class="border-t border-ink-100 px-4 py-3 text-sm text-ink-500 sm:px-6">+ {{ upcoming_total - upcoming|length }} more in the next {{ upcoming_days }} days</p>{% endif %}
+    {% else %}
+      <p class="px-4 py-5 text-sm text-ink-500 sm:px-6">Nothing scheduled in the next {{ upcoming_days }} days.</p>
+    {% endif %}
+  </section>
+
+  {% for group, label in [("income", "Income"), ("expense", "Bills & subscriptions")] %}
+    {% set items = rows|selectattr("rule.type", "equalto", group)|list %}
+    {% if items %}
+      <h2 class="mx-h2 mb-3 mt-8">{{ label }}</h2>
+      <section class="mx-card overflow-hidden" aria-label="{{ label }}">
+        <ul class="divide-y divide-ink-100">
+          {% for x in items %}
+            {% set r = x.rule %}
+            <li class="mx-rule {{ 'is-off' if x.status != 'active' }} flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 sm:px-6">
+              {{ c.cat_icon(r.category) }}
+              <div class="min-w-0 flex-1 basis-48">
+                <p class="truncate text-sm font-semibold">{{ r.name }}</p>
+                <p class="text-xs text-ink-500">{{ r.frequency_label }} · {{ r.category.name }}{% if r.wallet %} · {{ 'into' if r.is_income else 'from' }} {{ r.wallet.name }}{% endif %}{% if r.end_date and x.status != 'ended' %} · until {{ r.end_date.strftime('%b %d, %Y') }}{% endif %}</p>
+              </div>
+              <div class="text-left sm:w-40 sm:text-right">
+                <p class="text-sm font-bold tabular-nums {{ 'text-mint-700' if r.is_income }}">{{ ('+' if r.is_income else '−') ~ (r.amount|money) }}</p>
+                <p class="text-xs text-ink-500">
+                  {% if x.status == 'active' %}Next {{ x.next.strftime('%a, %b %d') }}
+                  {% elif x.status == 'paused' %}<span class="mx-badge is-neutral">Paused</span>
+                  {% else %}<span class="mx-badge is-neutral">Ended {{ r.end_date.strftime('%b %d') }}</span>{% endif %}
+                </p>
+              </div>
+              <div class="flex flex-none gap-1">
+                {% if x.status == 'active' and x.next %}
+                  <form method="post" action="{{ url_for('transactions.recurring_skip', rule_id=r.id) }}"
+                        data-confirm-title="Skip {{ x.next.strftime('%b %d') }}?" data-confirm="“{{ r.name }}” won't be added on {{ x.next.strftime('%b %d') }}. The schedule continues after that." >
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="mx-icon-btn-sm" aria-label="Skip next {{ r.name }}" title="Skip next"><i data-lucide="skip-forward"></i></button>
+                  </form>
+                {% endif %}
+                {% if x.status != 'ended' %}
+                  <form method="post" action="{{ url_for('transactions.recurring_toggle', rule_id=r.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="mx-icon-btn-sm" aria-label="{{ 'Pause' if r.active else 'Resume' }} {{ r.name }}" title="{{ 'Pause' if r.active else 'Resume' }}">
+                      <i data-lucide="{{ 'pause' if r.active else 'play' }}"></i></button>
+                  </form>
+                {% endif %}
+                <a href="{{ url_for('transactions.recurring_edit', rule_id=r.id) }}" class="mx-icon-btn-sm" aria-label="Edit {{ r.name }}" title="Edit"><i data-lucide="pencil"></i></a>
+                {{ c.delete_form(url_for('transactions.recurring_delete', rule_id=r.id), "Stop repeating “" ~ r.name ~ "”?",
+                                 "Nothing new will be added. Entries already added stay in your transactions.", "Delete " ~ r.name) }}
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  {% endfor %}
+{% else %}
+  <section class="mx-card">
+    {{ c.empty_state("repeat", "Nothing repeats yet",
+                     "Set up your allowance once and Monetrax adds it on every payday. It also tells Safe to spend today when your next allowance arrives.",
+                     url_for('transactions.recurring_new', type='income'), "Set up your allowance") }}
+  </section>
+{% endif %}
+{% endblock %}

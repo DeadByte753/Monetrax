@@ -1,0 +1,92 @@
+{% extends "layouts/app.html" %}
+{% block title %}{{ 'Edit transaction' if mode == 'edit' else 'New transaction' }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <a href="{{ next if is_safe_redirect(next) else url_for('transactions.index') }}" class="mx-back mb-4"><i data-lucide="arrow-left"></i>Back</a>
+  {{ c.page_header('Edit transaction' if mode == 'edit' else ('Duplicate transaction' if source else 'New transaction'),
+                   ('A copy of “' ~ source.name ~ '”. Check the date, then save.') if source else
+                   'Changes update your balance, budgets and dashboard right away.') }}
+
+  <form method="post" class="mx-card space-y-5 p-5 sm:p-8" data-tx-form novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+    <fieldset>
+      <legend class="mx-label">Type</legend>
+      <div class="mx-segment" role="radiogroup">
+        <label class="mx-segment-opt is-expense">
+          <input type="radio" name="type" value="expense" {% if values.type != 'income' %}checked{% endif %}>
+          <span><i data-lucide="arrow-up-right"></i>Expense</span>
+        </label>
+        <label class="mx-segment-opt is-income">
+          <input type="radio" name="type" value="income" {% if values.type == 'income' %}checked{% endif %}>
+          <span><i data-lucide="arrow-down-left"></i>Income</span>
+        </label>
+      </div>
+      {{ c.error_text("type", errors.type) }}
+    </fieldset>
+
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {{ c.input("amount", "Amount", values.amount, errors.amount, prefix=currency_symbol, placeholder="0.00",
+                 inputmode="decimal", required=True, extra='data-money autofocus') }}
+      {{ c.input("date", "Date", values.date, errors.date, type="date", required=True) }}
+    </div>
+
+    {{ c.input("name", "Transaction name", values.name, errors.name, placeholder="e.g. Lunch at canteen",
+               required=True, maxlength=100) }}
+
+    {% set opts = [] %}
+    {% for cat in categories %}{% set _ = opts.append((cat.id, cat.name, {"type": cat.type})) %}{% endfor %}
+    {{ c.select("category_id", "Category", opts, values.category_id, errors.category_id, placeholder="Choose a category",
+                extra='data-category-select') }}
+    <p class="-mt-3 text-xs text-ink-500">Need another category? <a href="{{ url_for('settings.index', section='categories') }}" class="mx-link">Add one in Settings</a>.</p>
+
+    {% set wopts = [] %}
+    {% for w in wallets %}{% set _ = wopts.append((w.id, w.name ~ (" (hidden)" if w.archived else ""))) %}{% endfor %}
+    <div class="mx-field{% if errors.wallet_id %} has-error{% endif %}">
+      <span class="mx-label" id="wallet-label" data-label-expense="Paid from" data-label-income="Received in">{{ 'Received in' if values.type == 'income' else 'Paid from' }}</span>
+      <div class="mx-wallet-pick" role="radiogroup" aria-labelledby="wallet-label">
+        {% for w in wallets %}
+          <label class="mx-wallet-chip" style="--cat: {{ w.color }}">
+            <input type="radio" name="wallet_id" value="{{ w.id }}" {% if values.wallet_id|string == w.id|string %}checked{% endif %}>
+            <span><i data-lucide="{{ w.icon }}"></i>{{ w.name }}{% if w.archived %} <em class="not-italic text-ink-500">(hidden)</em>{% endif %}</span>
+          </label>
+        {% endfor %}
+        <a href="{{ url_for('wallets.form') }}" class="mx-wallet-chip-add" aria-label="Add a wallet"><i data-lucide="plus"></i></a>
+      </div>
+      {{ c.error_text("wallet_id", errors.wallet_id) }}
+    </div>
+
+    {% if mode == 'create' %}
+      {% set ropts = [("", "Doesn't repeat")] %}
+      {% for k, label in frequencies.items() %}{% set _ = ropts.append((k, label)) %}{% endfor %}
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-end sm:gap-5">
+        {{ c.select("repeat", "Repeat", ropts, values.repeat, errors.repeat, required=False) }}
+        <p class="pb-1 text-[13px] leading-5 text-ink-500">For allowance, rent, load or subscriptions. Monetrax adds it for you on each date.</p>
+      </div>
+    {% elif tx.recurring_id %}
+      <p class="flex items-start gap-2 rounded-xl bg-canvas px-3 py-2.5 text-[13px] leading-5 text-ink-500">
+        <i data-lucide="repeat" class="mt-0.5 h-4 w-4 flex-none"></i>
+        <span>Added by a recurring schedule. Changes here apply to this entry only. <a href="{{ url_for('transactions.recurring_edit', rule_id=tx.recurring_id) }}" class="mx-link">Edit the schedule</a></span>
+      </p>
+    {% endif %}
+
+    {{ c.textarea("description", "Description", values.description, errors.description, "Add a note") }}
+
+    <div class="flex flex-col-reverse gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-end">
+      {% if mode == 'create' %}
+        <button type="submit" name="add_another" value="1" class="mx-btn-ghost">Save &amp; add another</button>
+      {% endif %}
+      <button type="submit" class="mx-btn-primary mx-btn-lg"><i data-lucide="check"></i>{{ 'Save changes' if mode == 'edit' else 'Add transaction' }}</button>
+    </div>
+  </form>
+
+  {% if mode == 'edit' %}
+    <div class="mt-4 flex justify-end">
+      {{ c.delete_form(url_for('transactions.delete', tx_id=tx.id), "Delete this transaction?",
+                       "“" ~ tx.name ~ "” will be removed and your totals will update.", "Delete transaction", False) }}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

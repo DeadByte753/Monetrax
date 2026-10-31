@@ -1,0 +1,96 @@
+{% macro logo(variant="dark", size=36, animate=False) -%}
+  {% set scale = [2, (size / 16)|round|int]|max %}
+  {% set mark = 16 * scale %}
+  <span class="mx-logo mx-logo-{{ variant }}{{ ' mx-logo-animate' if animate }}" style="--logo-size: {{ mark }}px">
+    <svg class="mx-logo-mark" viewBox="0 0 16 16" width="{{ mark }}" height="{{ mark }}" shape-rendering="crispEdges" aria-hidden="true">
+      <path class="mx-logo-tile" d="M1 0h14v1h1v14h-1v1h-14v-1h-1v-14h1z"/>
+      <path class="mx-logo-m" d="M2 4h2v1h-2zM11 4h1v1h-1zM2 5h3v1h-3zM10 5h2v1h-2zM2 6h4v1h-4zM9 6h2v1h-2zM2 7h2v1h-2zM5 7h2v1h-2zM8 7h2v1h-2zM2 8h2v1h-2zM6 8h3v1h-3zM2 9h2v1h-2zM7 9h1v1h-1zM2 10h2v1h-2zM2 11h2v1h-2zM2 12h2v1h-2zM2 13h2v1h-2z"/>
+      <path class="mx-logo-arrow" d="M9 2h5v1h-5zM9 3h5v1h-5zM12 4h2v1h-2zM12 5h2v1h-2zM12 6h2v1h-2z"/>
+      <path class="mx-logo-dot" d="M10 11h3v1h-3zM10 12h3v1h-3zM10 13h3v1h-3z"/>
+    </svg>
+    <svg class="mx-logo-word" viewBox="0 -8 63 7" width="{{ 63 * scale }}" height="{{ 7 * scale }}" shape-rendering="crispEdges" role="img" aria-label="Monetrax">
+      <path d="M0.0 -1.0V-8.0H2.0V-7.0H3.0V-6.0H4.0V-7.0H5.0V-8.0H7.0V-1.0H5.0V-5.0H4.0V-3.0H3.0V-5.0H2.0V-1.0ZM9.0 -1.0V-2.0H8.0V-5.0H9.0V-6.0H14.0V-5.0H15.0V-2.0H14.0V-1.0ZM10.0 -2.0H13.0V-5.0H10.0ZM16.0 -1.0V-6.0H22.0V-5.0H23.0V-1.0H21.0V-5.0H18.0V-1.0ZM25.0 -1.0V-2.0H24.0V-5.0H25.0V-6.0H30.0V-5.0H31.0V-3.0H26.0V-2.0H30.0V-1.0ZM26.0 -4.0H29.0V-5.0H26.0ZM35.0 -1.0V-5.0H33.0V-6.0H35.0V-8.0H37.0V-6.0H39.0V-5.0H37.0V-1.0ZM43.0 -5.0H44.0V-4.0H43.0V-1.0H41.0V-6.0H43.0ZM47.0 -6.0V-5.0H44.0V-6.0ZM49.0 -1.0V-2.0H48.0V-3.0H49.0V-4.0H53.0V-5.0H49.0V-6.0H54.0V-5.0H55.0V-1.0ZM50.0 -2.0H53.0V-3.0H50.0ZM56.0 -1.0V-2.0H57.0V-3.0H58.0V-4.0H57.0V-5.0H56.0V-6.0H58.0V-5.0H59.0V-4.0H60.0V-5.0H61.0V-6.0H63.0V-5.0H62.0V-4.0H61.0V-3.0H62.0V-2.0H63.0V-1.0H61.0V-2.0H60.0V-3.0H59.0V-2.0H58.0V-1.0Z"/>
+    </svg>
+  </span>
+{%- endmacro %}
+
+{% macro field(name, label, type="text", icon="mail", value="", error=None, placeholder="",
+               autocomplete="off", inputmode=None, hint=None, password=False, strength=False,
+               match=None) -%}
+  {% set fid = "f-" ~ name %}
+  <div class="mx-field{% if error %} has-error{% endif %}" data-field="{{ name }}">
+    <label for="{{ fid }}" class="mb-2 block text-sm font-semibold text-navy-900">{{ label }}</label>
+    <div class="relative">
+      <span class="mx-field-icon" aria-hidden="true"><i data-lucide="{{ icon }}"></i></span>
+      <input id="{{ fid }}" name="{{ name }}" type="{{ 'password' if password else type }}"
+             value="{{ value }}" placeholder="{{ placeholder }}" autocomplete="{{ autocomplete }}"
+             {% if inputmode %}inputmode="{{ inputmode }}"{% endif %}
+             {% if match %}data-match="{{ match }}"{% endif %}
+             spellcheck="false" autocapitalize="{{ 'words' if name == 'full_name' else 'off' }}"
+             class="mx-input{% if password %} has-toggle{% endif %}"
+             aria-invalid="{{ 'true' if error else 'false' }}"
+             aria-describedby="{{ fid }}-error{% if hint %} {{ fid }}-hint{% endif %}">
+      {% if password %}
+        <button type="button" class="mx-eye" data-toggle-password="{{ fid }}" aria-label="Show password" aria-pressed="false">
+          <span data-eye="show"><i data-lucide="eye"></i></span>
+          <span data-eye="hide" hidden><i data-lucide="eye-off"></i></span>
+        </button>
+      {% endif %}
+    </div>
+
+    {% if strength %}
+      <div class="mx-strength" data-strength-for="{{ fid }}" hidden>
+        <div class="mx-meter" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          <ul class="flex flex-wrap gap-x-3 gap-y-1.5">
+            <li class="mx-req" data-rule="length"><i data-lucide="check"></i>8+ characters</li>
+            <li class="mx-req" data-rule="number"><i data-lucide="check"></i>A number</li>
+            <li class="mx-req" data-rule="case"><i data-lucide="check"></i>Upper &amp; lowercase</li>
+          </ul>
+          <span class="text-xs font-semibold text-ink-500" data-strength-label aria-live="polite"></span>
+        </div>
+      </div>
+    {% endif %}
+
+    <p id="{{ fid }}-error" class="mx-error" aria-live="polite" {% if not error %}hidden{% endif %}>
+      <i data-lucide="circle-alert"></i><span data-error-text>{{ error or "" }}</span>
+    </p>
+    {% if hint %}
+      <p id="{{ fid }}-hint" class="mx-hint" data-hint-default="{{ hint }}">{{ hint }}</p>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro checkbox(name, checked=False, error=None) -%}
+
+  {% set fid = "f-" ~ name %}
+  <div class="mx-field{% if error %} has-error{% endif %}" data-field="{{ name }}">
+    <div class="flex items-start gap-3">
+      <span class="mx-check-wrap">
+        <input id="{{ fid }}" name="{{ name }}" type="checkbox" class="mx-check" {% if checked %}checked{% endif %}
+               aria-invalid="{{ 'true' if error else 'false' }}" aria-describedby="{{ fid }}-error">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" pathLength="1"/></svg>
+      </span>
+      <div class="pt-px text-sm leading-6 text-ink-500">{{ caller() }}</div>
+    </div>
+    <p id="{{ fid }}-error" class="mx-error mt-2" aria-live="polite" {% if not error %}hidden{% endif %}>
+      <i data-lucide="circle-alert"></i><span data-error-text>{{ error or "" }}</span>
+    </p>
+  </div>
+{%- endmacro %}
+
+{% macro button(label, loading_label, icon="arrow-right") -%}
+  <button type="submit" class="mx-btn" data-loading-label="{{ loading_label }}">
+    <span class="mx-btn-idle"><span>{{ label }}</span>{% if icon %}<i data-lucide="{{ icon }}" class="mx-btn-arrow"></i>{% endif %}</span>
+    <span class="mx-btn-busy" hidden><span class="mx-spinner" aria-hidden="true"></span><span>{{ loading_label }}</span></span>
+  </button>
+{%- endmacro %}
+
+{% macro alert(kind, message) -%}
+  {% set icons = {"success": "circle-check", "error": "circle-alert", "info": "info"} %}
+  <div class="mx-alert mx-alert-{{ kind }}" role="{{ 'alert' if kind == 'error' else 'status' }}">
+    <i data-lucide="{{ icons.get(kind, 'info') }}"></i>
+    <p class="flex-1">{{ message }}</p>
+    <button type="button" class="mx-alert-close" aria-label="Dismiss message" data-dismiss-alert><i data-lucide="x"></i></button>
+  </div>
+{%- endmacro %}

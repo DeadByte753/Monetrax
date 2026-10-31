@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Monetrax{% endblock %} · Monetrax</title>
+  <meta name="description" content="Monetrax helps college students manage allowances, track expenses and reach savings goals.">
+  <meta name="theme-color" content="#0B1B3F">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <script>
+    (function () {
+      var pref = "{{ theme_pref or '' }}";
+      try {
+        if (pref) localStorage.setItem("mx-theme", pref);
+        else pref = localStorage.getItem("mx-theme") || "system";
+      } catch (e) { pref = pref || "system"; }
+      var dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.classList.toggle("dark", dark);
+      document.documentElement.dataset.themePref = pref;
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.documentElement.classList.add("mx-motion");
+      }
+    })();
+  </script>
+  <link rel="icon" href="{{ url_for('static', filename='img/logo-mark.svg') }}" type="image/svg+xml">
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon-32.png') }}" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: { sans: ['VT323', 'ui-monospace', 'monospace'] },
+          colors: {
+            navy: { 950: '#07122B', 900: '#0B1B3F', 800: '#13285A', 700: '#1D3672', 100: '#E6EAF3' },
+            mint: { 50: 'rgb(var(--c-mint-50) / <alpha-value>)', 100: '#D1FAE5', 300: '#6EE7B7', 400: '#34D399', 500: '#10B981',
+                    700: 'rgb(var(--c-mint-700) / <alpha-value>)', 800: '#065F46' },
+            ink: { 500: 'rgb(var(--c-ink-500) / <alpha-value>)', 400: 'rgb(var(--c-ink-400) / <alpha-value>)',
+                   300: 'rgb(var(--c-ink-300) / <alpha-value>)', 200: 'rgb(var(--c-ink-200) / <alpha-value>)',
+                   100: 'rgb(var(--c-ink-100) / <alpha-value>)' },
+            canvas: 'rgb(var(--c-canvas) / <alpha-value>)',
+            surface: 'rgb(var(--c-surface) / <alpha-value>)'
+          },
+          boxShadow: {
+            card: '0 1px 2px rgba(11,27,63,.04), 0 12px 32px -8px rgba(11,27,63,.12)'
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  {% block head %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/motion.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pixel.css') }}">
+</head>
+<body class="h-full bg-canvas font-sans text-navy-900 antialiased" data-currency="{{ currency_symbol or '₱' }}"
+      {% if current_user.is_authenticated %}data-theme-endpoint="{{ url_for('settings.theme') }}"{% endif %}>
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:shadow-card">Skip to content</a>
+  <div class="mx-loadbar" aria-hidden="true"></div>
+  {% block body %}{% endblock %}
+
+  <script src="{{ url_for('static', filename='js/pixel-icons.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/motion.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

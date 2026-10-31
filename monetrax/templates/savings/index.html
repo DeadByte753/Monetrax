@@ -1,0 +1,112 @@
+{% extends "layouts/app.html" %}
+{% block title %}Savings Goals{% endblock %}
+
+{% block content %}
+{% call c.page_header("Savings Goals", "Put money aside for what matters and watch it grow.") %}
+  <a href="{{ url_for('savings.form') }}" class="mx-btn-primary"><i data-lucide="plus"></i>New goal</a>
+{% endcall %}
+
+<section class="grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Savings summary">
+  {{ c.stat_card("Total saved", total_saved|money, "piggy-bank", "mint") }}
+  {{ c.stat_card("Active goals", active|length, "target", "navy", (total_target|money) ~ " in targets" if active else None) }}
+  {{ c.stat_card("Goals reached", done|length, "trophy", "violet") }}
+</section>
+
+{% if active or done %}
+  <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-label="Active goals">
+    {% for g in active %}
+      {% set pace = paces[g.id] %}
+      <article id="goal-{{ g.id }}" class="mx-card p-5 sm:p-6">
+        <div class="flex items-start gap-3">
+          <span class="mx-tile mx-tile-mint h-11 w-11 rounded-2xl" aria-hidden="true"><i data-lucide="{{ g.icon }}"></i></span>
+          <div class="min-w-0 flex-1">
+            <h2 class="truncate text-base font-bold">{{ g.name }}</h2>
+            <p class="text-xs text-ink-500">
+              {% if g.target_date %}Target {{ g.target_date.strftime('%b %d, %Y') }}{% else %}No target date{% endif %}
+            </p>
+          </div>
+          <div class="flex gap-1">
+            <a href="{{ url_for('savings.form', goal_id=g.id) }}" class="mx-icon-btn-sm" aria-label="Edit {{ g.name }}" title="Edit"><i data-lucide="pencil"></i></a>
+            {{ c.delete_form(url_for('savings.delete', goal_id=g.id), "Delete this goal?",
+                             "“" ~ g.name ~ "” and its saving history will be removed.", "Delete " ~ g.name) }}
+          </div>
+        </div>
+
+        <div class="mt-5 flex items-end justify-between gap-2">
+          <p class="text-2xl font-extrabold tabular-nums" data-count>{{ g.saved_amount|money }}</p>
+          <p class="pb-0.5 text-sm text-ink-500 tabular-nums">of {{ g.target_amount|money }} · <span class="font-semibold text-navy-900">{{ g.percent|round|int }}%</span></p>
+        </div>
+        <div class="mt-3">{{ c.progress(g.percent, "goal", g.name ~ " progress") }}</div>
+        <p class="mt-3 text-sm text-ink-500">
+          {{ g.remaining_amount|money }} to go
+          {% if pace %}
+            {% if pace.overdue %}· <span class="font-medium text-[#B42318]">target date passed</span>
+            {% else %}· about <span class="font-semibold text-navy-900">{{ pace.per_week|money }}/week</span> for {{ pace.days_left }} more day{{ 's' if pace.days_left != 1 }}{% endif %}
+          {% endif %}
+        </p>
+
+        <form method="post" action="{{ url_for('savings.contribute', goal_id=g.id) }}" class="mt-5 rounded-2xl bg-canvas p-3 sm:p-4" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="relative sm:w-36">
+              <label for="dir-{{ g.id }}" class="sr-only">Add or withdraw</label>
+              <select id="dir-{{ g.id }}" name="direction" class="mx-control mx-select">
+                <option value="add">Add</option>
+                <option value="withdraw" {% if not g.saved_amount %}disabled{% endif %}>Withdraw</option>
+              </select>
+              <i data-lucide="chevron-down" class="mx-select-caret" aria-hidden="true"></i>
+            </div>
+            <div class="relative flex-1">
+              <label for="amt-{{ g.id }}" class="sr-only">Amount</label>
+              <span class="mx-prefix" aria-hidden="true">{{ currency_symbol }}</span>
+              <input id="amt-{{ g.id }}" name="amount" inputmode="decimal" placeholder="0.00" class="mx-control has-prefix" data-money required>
+            </div>
+            <button type="submit" class="mx-btn-primary"><i data-lucide="plus"></i>Save</button>
+          </div>
+        </form>
+
+        {% if g.contributions %}
+          <details class="mx-details mt-4">
+            <summary>History ({{ g.contributions|length }})</summary>
+            <ul class="mt-2 divide-y divide-ink-100">
+              {% for ct in g.contributions[:12] %}
+                <li class="flex items-center gap-3 py-2 text-sm">
+                  <span class="w-20 text-ink-500">{{ ct.date.strftime('%b %d') }}</span>
+                  <span class="flex-1 truncate text-ink-500">{{ ct.note or ('Deposit' if ct.amount > 0 else 'Withdrawal') }}</span>
+                  <span class="font-semibold tabular-nums {{ 'text-mint-700' if ct.amount > 0 else 'text-[#B42318]' }}">{{ ct.amount|money(signed=True) }}</span>
+                  {{ c.delete_form(url_for('savings.delete_contribution', cid=ct.id), "Remove this entry?",
+                                   "Your saved total for " ~ g.name ~ " will be recalculated.", "Remove entry") }}
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </section>
+
+  {% if done %}
+    <h2 class="mx-h2 mb-3 mt-10">Goals reached</h2>
+    <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Completed goals">
+      {% for g in done %}
+        <article id="goal-{{ g.id }}" class="mx-card flex items-center gap-3 p-4">
+          <span class="mx-tile mx-tile-mint h-10 w-10" aria-hidden="true"><i data-lucide="trophy"></i></span>
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-semibold">{{ g.name }}</p>
+            <p class="text-xs text-ink-500">{{ g.saved_amount|money }} saved{% if g.completed_at %} · {{ g.completed_at.strftime('%b %d, %Y') }}{% endif %}</p>
+          </div>
+          <a href="{{ url_for('savings.form', goal_id=g.id) }}" class="mx-icon-btn-sm" aria-label="Edit {{ g.name }}"><i data-lucide="pencil"></i></a>
+          {{ c.delete_form(url_for('savings.delete', goal_id=g.id), "Delete this goal?",
+                           "“" ~ g.name ~ "” and its saving history will be removed.", "Delete " ~ g.name) }}
+        </article>
+      {% endfor %}
+    </section>
+  {% endif %}
+{% else %}
+  <section class="mx-card mt-6">
+    {{ c.empty_state("piggy-bank", "Start your first savings goal",
+                     "A new laptop, a trip, an emergency fund — name it, set a target, and add to it whenever you can.",
+                     url_for('savings.form'), "New goal") }}
+  </section>
+{% endif %}
+{% endblock %}

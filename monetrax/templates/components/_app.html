@@ -1,0 +1,115 @@
+{% macro page_header(title, subtitle=None) -%}
+  <div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+    <div class="min-w-0">
+      <h1 class="text-2xl font-extrabold tracking-tight sm:text-[1.75rem]">{{ title }}</h1>
+      {% if subtitle %}<p class="mt-1 text-[15px] text-ink-500">{{ subtitle }}</p>{% endif %}
+    </div>
+    {% if caller %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro stat_card(label, value, icon, tone="navy", sub=None, sub_tone=None) -%}
+  <div class="mx-card p-5">
+    <div class="flex items-start justify-between gap-3">
+      <p class="text-sm font-medium text-ink-500">{{ label }}</p>
+      <span class="mx-tile mx-tile-{{ tone }}" aria-hidden="true"><i data-lucide="{{ icon }}"></i></span>
+    </div>
+    <p class="mt-3 text-[1.6rem] font-extrabold tracking-tight tabular-nums" data-count>{{ value }}</p>
+    {% if sub %}<p class="mt-1 text-[13px] {{ 'text-mint-700' if sub_tone == 'up' else ('text-[#B42318]' if sub_tone == 'down' else 'text-ink-500') }}">{{ sub }}</p>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro progress(percent, level="ok", label=None) -%}
+  <div class="mx-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ percent|round|int }}"
+       {% if label %}aria-label="{{ label }}"{% endif %}>
+    <span class="mx-progress-bar is-{{ level }}" style="width: {{ [percent, 100]|min }}%"></span>
+  </div>
+{%- endmacro %}
+
+{% macro level_badge(level, percent) -%}
+  {% set labels = {"ok": "On track", "caution": "75% used", "warning": "Near limit", "over": "Over budget"} %}
+  <span class="mx-badge is-{{ level }}">{{ labels[level] }}</span>
+{%- endmacro %}
+
+{% macro empty_state(icon, title, text, action_url=None, action_label=None) -%}
+  <div class="flex flex-col items-center px-6 py-12 text-center">
+    <span class="mx-tile mx-tile-mint mb-4 h-14 w-14 rounded-2xl" aria-hidden="true"><i data-lucide="{{ icon }}"></i></span>
+    <p class="text-base font-bold">{{ title }}</p>
+    <p class="mt-1 max-w-sm text-sm text-ink-500">{{ text }}</p>
+    {% if action_url %}<a href="{{ action_url }}" class="mx-btn-primary mt-5"><i data-lucide="plus"></i>{{ action_label }}</a>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro cat_icon(category, size="md") -%}
+  <span class="mx-cat mx-cat-{{ size }}" style="--cat: {{ category.color }}" aria-hidden="true"><i data-lucide="{{ category.icon }}"></i></span>
+{%- endmacro %}
+
+{% macro error_text(name, error) -%}
+  {% if error %}<p id="f-{{ name }}-error" class="mx-error"><i data-lucide="circle-alert"></i><span>{{ error }}</span></p>{% endif %}
+{%- endmacro %}
+
+{% macro input(name, label, value="", error=None, type="text", placeholder="", prefix=None, hint=None,
+               required=False, inputmode=None, autocomplete="off", maxlength=None, extra="") -%}
+  <div class="mx-field{% if error %} has-error{% endif %}">
+    <label for="f-{{ name }}" class="mx-label">{{ label }}{% if not required %} <span class="font-normal text-ink-500">(optional)</span>{% endif %}</label>
+    <div class="relative">
+      {% if prefix %}<span class="mx-prefix" aria-hidden="true">{{ prefix }}</span>{% endif %}
+      <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}" placeholder="{{ placeholder }}"
+             autocomplete="{{ autocomplete }}" {% if inputmode %}inputmode="{{ inputmode }}"{% endif %}
+             {% if maxlength %}maxlength="{{ maxlength }}"{% endif %} {% if required %}required{% endif %}
+             class="mx-control{% if prefix %} has-prefix{% endif %}" aria-invalid="{{ 'true' if error else 'false' }}"
+             {% if error or hint %}aria-describedby="{% if error %}f-{{ name }}-error{% endif %}{% if hint %} f-{{ name }}-hint{% endif %}"{% endif %}
+             {{ extra|safe }}>
+    </div>
+    {{ error_text(name, error) }}
+    {% if hint and not error %}<p id="f-{{ name }}-hint" class="mx-hint">{{ hint }}</p>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro select(name, label, options, selected="", error=None, placeholder=None, required=True, extra="") -%}
+
+  <div class="mx-field{% if error %} has-error{% endif %}">
+    <label for="f-{{ name }}" class="mx-label">{{ label }}</label>
+    <div class="relative">
+      <select id="f-{{ name }}" name="{{ name }}" class="mx-control mx-select" {% if required %}required{% endif %}
+              aria-invalid="{{ 'true' if error else 'false' }}" {% if error %}aria-describedby="f-{{ name }}-error"{% endif %} {{ extra|safe }}>
+        {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+        {% for opt in options %}
+          <option value="{{ opt[0] }}" {% if opt[0]|string == selected|string %}selected{% endif %}
+            {% if opt|length > 2 %}{% for k, v in opt[2].items() %}data-{{ k }}="{{ v }}" {% endfor %}{% endif %}>{{ opt[1] }}</option>
+        {% endfor %}
+      </select>
+      <i data-lucide="chevron-down" class="mx-select-caret" aria-hidden="true"></i>
+    </div>
+    {{ error_text(name, error) }}
+  </div>
+{%- endmacro %}
+
+{% macro textarea(name, label, value="", error=None, placeholder="", maxlength=500) -%}
+  <div class="mx-field{% if error %} has-error{% endif %}">
+    <label for="f-{{ name }}" class="mx-label">{{ label }} <span class="font-normal text-ink-500">(optional)</span></label>
+    <textarea id="f-{{ name }}" name="{{ name }}" rows="3" maxlength="{{ maxlength }}" placeholder="{{ placeholder }}"
+              class="mx-control mx-textarea" aria-invalid="{{ 'true' if error else 'false' }}">{{ value }}</textarea>
+    {{ error_text(name, error) }}
+  </div>
+{%- endmacro %}
+
+{% macro delete_form(action, title, text, label="Delete", icon_only=True, next=None) -%}
+  <form method="post" action="{{ action }}" data-confirm="{{ text }}" data-confirm-title="{{ title }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% if icon_only %}
+      <button type="submit" class="mx-icon-btn-sm is-danger" aria-label="{{ label }}" title="{{ label }}"><i data-lucide="trash-2"></i></button>
+    {% else %}
+      <button type="submit" class="mx-btn-ghost is-danger"><i data-lucide="trash-2"></i>{{ label }}</button>
+    {% endif %}
+  </form>
+{%- endmacro %}
+
+{% macro tx_amount(tx) -%}
+  <span class="font-bold tabular-nums {{ 'text-mint-700' if tx.is_income else 'text-navy-900' }}">{{ tx.signed_amount|money(signed=True) }}</span>
+{%- endmacro %}
+
+{% macro chart_data(id, data) -%}
+  <script type="application/json" id="{{ id }}">{{ data|tojson }}</script>
+{%- endmacro %}

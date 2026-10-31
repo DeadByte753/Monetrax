@@ -1,0 +1,196 @@
+{% extends "layouts/app.html" %}
+{% block title %}Analytics & Reports{% endblock %}
+
+{% macro delta(value, good_when_down=False) -%}
+  {% if value is none %}<span class="text-ink-500">No data for the previous period</span>
+  {% else %}
+    {% set up = value >= 0 %}
+    {% set good = (not up) if good_when_down else up %}
+    <span class="{{ 'text-mint-700' if good else 'text-[#B42318]' }}">{{ '▲' if up else '▼' }} {{ value|abs|round|int }}%</span>
+    <span class="text-ink-500">vs previous period</span>
+  {% endif %}
+{%- endmacro %}
+
+{% block content %}
+{% call c.page_header("Analytics & Reports", start.strftime('%b %d, %Y') ~ " – " ~ end.strftime('%b %d, %Y') ~ " · " ~ days ~ " day" ~ ("s" if days != 1 else "")) %}
+  <a href="{{ url_for('analytics.monthly', month=end.strftime('%Y-%m')) }}" class="mx-btn-secondary"><i data-lucide="file-text"></i>Monthly summary</a>
+  <a download href="{{ url_for('transactions.export_csv', start=start.isoformat(), end=end.isoformat()) }}" class="mx-btn-secondary"><i data-lucide="download"></i>Export CSV</a>
+  <button type="button" class="mx-btn-secondary" data-print><i data-lucide="printer"></i>Print report</button>
+{% endcall %}
+
+<form method="get" class="mx-card mb-6 flex flex-wrap items-end gap-3 p-4 print:hidden" data-range-form aria-label="Report period">
+  <div class="mx-chips" role="radiogroup" aria-label="Period">
+    {% for k, label in ranges %}
+      <label class="mx-chip-opt"><input type="radio" name="range" value="{{ k }}" {% if k == key %}checked{% endif %}><span>{{ label }}</span></label>
+    {% endfor %}
+  </div>
+  <div class="flex flex-wrap items-end gap-2" data-custom-range {% if key != 'custom' %}hidden{% endif %}>
+    <label class="text-xs font-medium text-ink-500">From<input type="date" name="start" value="{{ start.isoformat() }}" class="mx-control mt-1"></label>
+    <label class="text-xs font-medium text-ink-500">To<input type="date" name="end" value="{{ end.isoformat() }}" class="mx-control mt-1"></label>
+    <button type="submit" class="mx-btn-primary mx-btn-sm">Apply</button>
+  </div>
+  {% if range_error %}<p class="mx-error w-full"><i data-lucide="circle-alert"></i>{{ range_error }}</p>{% endif %}
+</form>
+
+<section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key figures">
+  <div class="mx-card p-5">
+    <p class="text-sm font-medium text-ink-500">Income</p>
+    <p class="mt-2 text-[1.6rem] font-extrabold tabular-nums">{{ t.income|money }}</p>
+    <p class="mt-1 text-[13px]">{{ delta(income_change) }}</p>
+  </div>
+  <div class="mx-card p-5">
+    <p class="text-sm font-medium text-ink-500">Expenses</p>
+    <p class="mt-2 text-[1.6rem] font-extrabold tabular-nums">{{ t.expense|money }}</p>
+    <p class="mt-1 text-[13px]">{{ delta(expense_change, True) }}</p>
+  </div>
+  <div class="mx-card p-5">
+    <p class="text-sm font-medium text-ink-500">Net</p>
+    <p class="mt-2 text-[1.6rem] font-extrabold tabular-nums {{ 'text-[#B42318]' if t.balance < 0 }}">{{ t.balance|money }}</p>
+    <p class="mt-1 text-[13px] text-ink-500">{% if savings_rate is not none %}{{ savings_rate|round|int }}% of income kept{% else %}No income in this period{% endif %}</p>
+  </div>
+  <div class="mx-card p-5">
+    <p class="text-sm font-medium text-ink-500">Average daily spend</p>
+    <p class="mt-2 text-[1.6rem] font-extrabold tabular-nums">{{ avg_daily|money }}</p>
+    <p class="mt-1 text-[13px] text-ink-500">{{ t.count }} transaction{{ 's' if t.count != 1 }}</p>
+  </div>
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+  <div class="mx-card p-5 sm:p-6 xl:col-span-2">
+    <h2 class="mx-h2">Income vs expenses</h2>
+    <p class="text-sm text-ink-500">{{ flow_label }} totals</p>
+    <div class="mx-chart mt-4 h-72"><canvas data-chart="flow" data-source="an-data" role="img" aria-label="{{ flow_label }} income and expenses"></canvas></div>
+  </div>
+  <div class="mx-card p-5 sm:p-6">
+    <h2 class="mx-h2">Expense breakdown</h2>
+    <p class="text-sm text-ink-500">By category</p>
+    {% if exp_cats %}
+      <div class="mx-chart mx-auto mt-4 h-52 w-52"><canvas data-chart="categories" data-source="an-data" role="img" aria-label="Expenses by category"></canvas></div>
+    {% else %}
+      {{ c.empty_state("chart-pie", "No expenses", "Nothing was spent in this period.") }}
+    {% endif %}
+  </div>
+  <div class="mx-card p-5 sm:p-6 xl:col-span-3">
+    <h2 class="mx-h2">Spending trend</h2>
+    <p class="text-sm text-ink-500">{{ trend_label }} expenses</p>
+    <div class="mx-chart mt-4 h-60"><canvas data-chart="trend" data-source="an-data" role="img" aria-label="{{ trend_label }} spending over the period"></canvas></div>
+  </div>
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3" aria-label="Savings and wallets">
+  <div class="mx-card p-5 sm:p-6 xl:col-span-2">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 class="mx-h2">Monthly savings progress</h2>
+        <p class="text-sm text-ink-500">Last {{ savings_months }} months to {{ end.strftime('%b %Y') }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-ink-500">
+        <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 bg-mint-500"></span>Net saved</span>
+        <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5" style="background: var(--gold)"></span>In savings goals</span>
+      </div>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      <p class="text-ink-500">Net over these months: <span class="font-semibold tabular-nums {{ 'text-[#B42318]' if savings_net_total < 0 else 'text-navy-900' }}">{{ savings_net_total|money }}</span></p>
+      <p class="text-ink-500">In goals now: <span class="font-semibold tabular-nums text-navy-900">{{ savings_goal_now|money }}</span></p>
+    </div>
+    <div class="mx-chart mt-4 h-64"><canvas data-chart="savings" data-source="an-data" role="img" aria-label="Bar chart of money saved each month with a line for total held in savings goals"></canvas></div>
+  </div>
+
+  <div class="mx-card p-5 sm:p-6">
+    <h2 class="mx-h2">Wallet balances</h2>
+    <p class="text-sm text-ink-500">As of today · total {{ wallet_total|money }}</p>
+    {% if wallets %}
+      <div class="mx-chart mt-4" style="height: {{ [wallets|length * 44 + 40, 140]|max }}px"><canvas data-chart="wallets" data-source="an-data" role="img" aria-label="Bar chart of the balance in each wallet"></canvas></div>
+      <ul class="mt-4 space-y-2 text-sm">
+        {% for b in wallets %}
+          <li class="flex items-center gap-2">
+            <span class="h-2.5 w-2.5 flex-none" style="background: {{ b.wallet.color }}"></span>
+            <span class="min-w-0 flex-1 truncate">{{ b.wallet.name }}{% if not b.wallet.spendable %} <span class="text-xs text-ink-500">· savings</span>{% endif %}</span>
+            <span class="text-ink-500 tabular-nums">{% if wallet_total > 0 and b.balance > 0 %}{{ (b.balance / wallet_total * 100)|round|int }}%{% endif %}</span>
+            <span class="w-24 text-right font-semibold tabular-nums {{ 'text-[#B42318]' if b.is_negative }}">{{ b.balance|money }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {{ c.empty_state("wallet", "No wallets", "Add a wallet to see where your money is.", url_for('wallets.form'), "Add a wallet") }}
+    {% endif %}
+  </div>
+</section>
+
+<section class="mt-6 mx-card p-5 sm:p-6" aria-label="Highest spending categories">
+  <h2 class="mx-h2">Highest spending categories</h2>
+  <p class="text-sm text-ink-500">Top {{ top|length if top else 5 }} for this period</p>
+  {% if top %}
+    <div class="mx-chart mt-4" style="height: {{ top|length * 48 + 40 }}px"><canvas data-chart="topCategories" data-source="an-data" role="img" aria-label="Bar chart of the categories with the highest spending"></canvas></div>
+  {% else %}
+    <p class="mt-3 text-sm text-ink-500">No expenses in this period.</p>
+  {% endif %}
+</section>
+
+<section class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+  <div class="mx-card overflow-hidden">
+    <h2 class="mx-h2 px-5 pt-5 sm:px-6">Spending by category</h2>
+    {% if exp_cats %}
+      <div class="overflow-x-auto">
+        <table class="mx-table mt-2">
+          <thead><tr><th scope="col">Category</th><th scope="col" class="text-right">Count</th><th scope="col" class="text-right">Share</th><th scope="col" class="text-right">Total</th></tr></thead>
+          <tbody>
+            {% for cat in exp_cats %}
+              <tr>
+                <td><div class="flex items-center gap-3">{{ c.cat_icon(cat.category, "sm") }}<span class="font-semibold">{{ cat.name }}</span></div></td>
+                <td class="text-right text-ink-500 tabular-nums">{{ cat.count }}</td>
+                <td class="text-right tabular-nums">
+                  <div class="flex items-center justify-end gap-2">
+                    <span class="mx-minibar"><span style="width: {{ cat.share }}%; background: {{ cat.color }}"></span></span>{{ cat.share|round|int }}%
+                  </div>
+                </td>
+                <td class="text-right font-semibold tabular-nums">{{ cat.total|money }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="px-6 pb-6 pt-2 text-sm text-ink-500">No expenses in this period.</p>
+    {% endif %}
+  </div>
+
+  <div class="space-y-6">
+    <div class="mx-card p-5 sm:p-6">
+      <h2 class="mx-h2">Income sources</h2>
+      {% if inc_cats %}
+        <ul class="mt-4 space-y-3">
+          {% for cat in inc_cats %}
+            <li class="flex items-center gap-3 text-sm">
+              {{ c.cat_icon(cat.category, "sm") }}
+              <span class="flex-1 font-medium">{{ cat.name }}</span>
+              <span class="text-ink-500 tabular-nums">{{ cat.share|round|int }}%</span>
+              <span class="w-28 text-right font-semibold tabular-nums text-mint-700">{{ cat.total|money }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="mt-2 text-sm text-ink-500">No income recorded in this period.</p>
+      {% endif %}
+    </div>
+    <div class="mx-card p-5 sm:p-6">
+      <h2 class="mx-h2">Largest expenses</h2>
+      {% if biggest %}
+        <ul class="mt-3 divide-y divide-ink-100">
+          {% for tx in biggest %}
+            <li class="flex items-center gap-3 py-2.5 text-sm">
+              {{ c.cat_icon(tx.category, "sm") }}
+              <div class="min-w-0 flex-1"><p class="truncate font-semibold">{{ tx.name }}</p><p class="text-xs text-ink-500">{{ tx.category.name }} · {{ tx.date.strftime('%b %d') }}</p></div>
+              <span class="font-bold tabular-nums">{{ tx.amount|money }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="mt-2 text-sm text-ink-500">No expenses in this period.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{{ c.chart_data("an-data", charts) }}
+{% endblock %}

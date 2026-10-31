@@ -1,0 +1,60 @@
+{% extends "auth/_layout.html" %}
+{% block title %}Create your account{% endblock %}
+
+{% block tabs %}{% with active = "register" %}{% include "auth/_tabs.html" %}{% endwith %}{% endblock %}
+
+{% block card %}
+<header class="mb-7">
+  <h2 id="auth-title" class="text-[1.75rem] font-extrabold leading-tight tracking-tight">Create your Monetrax account</h2>
+  <p class="mt-2 text-[15px] text-ink-500">Start managing your money smarter.</p>
+</header>
+
+{% if errors.form %}<div class="mb-6">{{ ui.alert("error", errors.form) }}</div>{% endif %}
+
+<form method="post" action="{{ url_for('auth.register') }}" class="space-y-5" data-auth-form="register"
+      data-require-school="{{ 'true' if require_school else 'false' }}" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  {{ ui.field("full_name", "Full name", icon="user", value=form.full_name, error=errors.full_name,
+              placeholder="Juan Dela Cruz", autocomplete="name") }}
+
+  {{ ui.field("email", "Student email", type="email", icon="mail", value=form.email, error=errors.email,
+              placeholder="juan.delacruz@school.edu.ph", autocomplete="email", inputmode="email",
+              hint=("Use the email issued by your school (ends in .edu or .edu.ph)." if require_school else None)) }}
+
+  {{ ui.field("password", "Password", icon="lock", error=errors.password, password=True, strength=True,
+              placeholder="Create a password", autocomplete="new-password") }}
+
+  {{ ui.field("confirm_password", "Confirm password", icon="lock-keyhole", error=errors.confirm_password,
+              password=True, match="f-password", placeholder="Re-enter your password", autocomplete="new-password",
+              hint="Both passwords must match.") }}
+
+  {% call ui.checkbox("terms", checked=form.terms, error=errors.terms) %}
+    <label for="f-terms" class="cursor-pointer">I agree to the</label>
+    <button type="button" class="mx-link" data-open-dialog="terms-dialog">Terms and Conditions</button>
+    <label for="f-terms" class="cursor-pointer">and</label>
+    <button type="button" class="mx-link" data-open-dialog="terms-dialog">Privacy Policy</button>.
+  {% endcall %}
+
+  <div class="pt-1">{{ ui.button("Create Account", "Creating account…") }}</div>
+</form>
+
+<p class="mt-8 text-center text-sm text-ink-500">
+  Already have an account? <a href="{{ url_for('auth.login') }}" class="mx-link" data-transition>Sign in.</a>
+</p>
+
+<dialog id="terms-dialog" class="mx-dialog" aria-labelledby="terms-title">
+  <div class="flex items-start justify-between gap-4">
+    <h3 id="terms-title" class="text-lg font-bold">Terms &amp; Privacy</h3>
+    <button type="button" class="mx-icon-btn" data-close-dialog aria-label="Close"><i data-lucide="x"></i></button>
+  </div>
+  <div class="mt-3 max-h-[50vh] space-y-3 overflow-y-auto text-sm leading-6 text-ink-500">
+    <p>[Add the Monetrax Terms and Conditions here.]</p>
+    <p>[Add the Monetrax Privacy Policy here, including what data is stored and how it is used.]</p>
+  </div>
+  <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+    <button type="button" class="mx-btn-ghost" data-close-dialog>Close</button>
+    <button type="button" class="mx-btn mx-btn-sm" data-accept-terms>I agree</button>
+  </div>
+</dialog>
+{% endblock %}
